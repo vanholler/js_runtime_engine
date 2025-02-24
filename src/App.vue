@@ -20,14 +20,39 @@ export default {
   },
 
   mounted() {
-    this.editor = monaco.editor.create(document.getElementById('editor'), {
-      value: this.simple,
-      language: 'javascript',
-      theme: 'vs-dark',
-      automaticLayout: true
+    monaco.editor.defineTheme('my-custom-theme', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [{ token: '', background: '#282a36' }],
+      colors: {
+        'editor.background': '#282a36',
+        'editor.foreground': '#f8f8f2',
+        'editorCursor.foreground': '#f8f8f2'
+      }
     });
-  },
 
+    const container = this.$refs.editorContainer;
+
+    const editor = monaco.editor.create(container, {
+      value: '// Введите код...',
+      language: 'javascript',
+      theme: 'my-custom-theme',
+      wordWrap: 'on',
+      overflow: 'hidden',
+      horizontalScrollbarSize: 0,
+      scrollBeyondLastLine: false
+    });
+    this.editor = editor;
+
+     window.addEventListener('resize', () => {
+        editor.layout();
+      });
+  },
+  beforeUnmount() {
+      if (this.editor) {
+        this.editor.dispose();
+      }
+    },
   methods: {
     onChange(value) {
       console.log(value);
@@ -55,8 +80,8 @@ export default {
     </div>
 
     <div id="repl-container">
-      <div id="editor" style="height: 100%;"></div>
-    
+      <!-- <div id="editor" style="height: 100%;"></div> -->
+      <div ref="editorContainer" style="width: 100%; height: 400px;"></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
       <div id="global-scope-display">
       </div>
