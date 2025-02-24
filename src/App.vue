@@ -1,9 +1,10 @@
 <script>
-// import * as monaco from 'monaco-editor';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
 
+import * as esprima from 'esprima'; // Импортируем Esprima
+import * as escodegen from 'escodegen'; // Импортируем Escodegen (опционально)
 
 export default {
   components: {
@@ -86,43 +87,119 @@ export default {
     makeJsResultOutput() {
       // Очищаем предыдущий вывод
       this.output = '';
-      
+
       // Перенаправляем консольные логи
       const originalConsoleLog = console.log;
       console.log = (message) => {
-        this.output += message + '\n'; // Добавляем сообщение в вывод
+        // Форматируем вывод для массивов и объектов
+        if (typeof message === 'object') {
+          this.output += JSON.stringify(message, null, 2) + '\n'; // Красивый вывод объектов и массивов
+        } else {
+          this.output += message + '\n'; // Добавляем сообщение в вывод
+        }
         originalConsoleLog(message); // Выводим в консоль
       };
 
       try {
         // Выполняем код из переменной simple
         const result = eval(this.simple); // Выполняем код
-        this.output += result !== undefined ? result : ''; // Добавляем результат выполнения
+        this.output += result !== undefined ? JSON.stringify(result, null, 2) : ''; // Добавляем результат выполнения
+
+        // Собираем все переменные и их значения
+        this.displayGlobalVariables();
       } catch (error) {
         this.output += error.message; // Обрабатываем ошибки
       } finally {
         console.log = originalConsoleLog; // Восстанавливаем оригинальный console.log
       }
     },
+    displayGlobalVariables() {
+      const variables = {};
+
+      try {
+        // Парсим код в AST (абстрактное синтаксическое дерево)
+        const ast = esprima.parseScript(this.simple, { range: true });
+
+        // Рекурсивно обходим AST
+        const traverse = (node) => {
+          if (!node) return;
+
+          // Обрабатываем объявления переменных
+          if (node.type === 'VariableDeclaration') {
+            node.declarations.forEach((declaration) => {
+              if (declaration.id && declaration.id.type === 'Identifier') {
+                const variableName = declaration.id.name;
+
+                // Если переменная инициализирована, получаем её значение
+                if (declaration.init) {
+                  try {
+                    // Используем new Function для вычисления значения
+                    variables[variableName] = new Function(`return ${escodegen.generate(declaration.init)}`)();
+                  } catch (error) {
+                    console.error(`Ошибка при вычислении значения переменной ${variableName}:`, error);
+                    variables[variableName] = undefined;
+                  }
+                } else {
+                  variables[variableName] = undefined; // Переменная без инициализации
+                }
+              }
+            });
+          }
+
+          // Рекурсивно обходим дочерние узлы
+          for (const key in node) {
+            if (node[key] && typeof node[key] === 'object') {
+              traverse(node[key]);
+            }
+          }
+        };
+
+        traverse(ast);
+
+        console.log(variables)
+        // const globalScopeDisplay = this.$refs.globalScopeDisplay;
+        // globalScopeDisplay.innerHTML = JSON.stringify(variables, null, 2);
+      } catch (error) {
+        console.error('Ошибка при анализе кода:', error);
+      }
+    },
+    startResize(event) {
+      event.preventDefault();
+      window.addEventListener('mousemove', this.resize);
+      window.addEventListener('mouseup', this.stopResize);
+    },
+    resize(event) {
+      const replContainer = this.$refs.replContainer;
+      const editorContainer = this.$refs.editorContainer; // Получаем ссылку на редактор
+      const newHeight = event.clientY - replContainer.getBoundingClientRect().top;
+
+      // Устанавливаем новую высоту для repl-container и editor
+      replContainer.style.height = `${newHeight}px`;
+      editorContainer.style.height = 'auto'; // Устанавливаем высоту в auto
+
+
+    },
+    stopResize() {
+      window.removeEventListener('mousemove', this.resize);
+      window.removeEventListener('mouseup', this.stopResize);
+    },
   },
 
-  watch: {
-
-  },
+  watch: {},
 }
 </script>
 
 <template>
   <div id="main">
 
-    <div id="repl-container">
+    <div id="repl-container" ref="replContainer">
       <div id="editor" ref="editorContainer" style="height: 100%;"></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
-      <div id="global-scope-display">
+      <div id="global-scope-display" ref="globalScopeDisplay">
       </div>
     </div>
 
-    <div class="resizer" data-direction="vertical"></div> <!-- Вертикальный разделитель -->
+    <div class="resizer" data-direction="vertical" @mousedown="startResize"></div> <!-- Вертикальный разделитель -->
     <div id="console-output">{{ output }}</div>
   </div>
 </template>

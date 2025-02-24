@@ -37,6 +37,8 @@
     "codemirror": "^6.0.1",
     "electron-squirrel-startup": "^1.0.0",
     "electron-updater": "^6.3.9",
+    "escodegen": "^2.1.0",
+    "esprima": "^4.0.1",
     "highlight.js": "^11.9.0",
     "json2schema": "^1.1.0",
     "lodash.debounce": "^4.0.8",

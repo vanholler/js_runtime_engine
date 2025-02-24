@@ -14,7 +14,7 @@ body {
 
 #repl-container {
     max-width: 70%;
-    height: calc(90vh - 40px); /* Учитываем высоту заголовка */
+    height: calc(80vh - 40px); /* Учитываем высоту заголовка */
     display: flex;
     flex-direction:row;
     font-family: monospace;
@@ -29,7 +29,7 @@ body {
     color: #fff;
     font-family: monospace;
     resize: none; /* Отключаем изменение размера textarea */
-    height: 100px; /* Фиксированная высота */
+    height: 100vh; /* Фиксированная высота */
 }
 
 #editor {
