@@ -20,7 +20,6 @@ export default {
   },
 
   async mounted() {
-
     monaco.editor.defineTheme('my-custom-theme', {
       base: 'vs-dark',
       inherit: true,
@@ -35,7 +34,7 @@ export default {
     const container = this.$refs.editorContainer;
 
     const editor = monaco.editor.create(container, {
-      value: '// Введите код...',
+      value: this.simple,
       language: 'javascript',
       theme: 'my-custom-theme',
       wordWrap: 'on',
@@ -45,28 +44,48 @@ export default {
     });
     this.editor = editor;
 
+    // Добавляем обработчик события изменения содержимого модели
+    await editor.onDidChangeModelContent(() => {
+      this.simple = editor.getValue(); // Обновляем значение переменной simple
+    });
+
     window.addEventListener('resize', () => {
       editor.layout();
     });
 
-    // Добавляем обработчик события нажатия клавиши
-    window.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        const lines = document.querySelectorAll('.view-line span');
-        let code = '';
-        lines.forEach(line => {
-          code += line.textContent + '\n'; // Собираем текст из каждого span
-        });
-        this.output = code; // Отображаем в console-output
-      }
-    });
+    this.setupEditor();
   },
   beforeUnmount() {
     if (this.editor) {
       this.editor.dispose();
     }
+    // Убираем обработчик события при уничтожении компонента
+    const editorContainer = this.$refs.editorContainer;
+    if (editorContainer) {
+      editorContainer.removeEventListener('keydown', this.handleKeyDown);
+    }
   },
   methods: {
+    setupEditor() {
+      const editorContainer = this.$refs.editorContainer;
+
+      // Добавляем обработчик события keydown
+      editorContainer.addEventListener('keydown', this.handleKeyDown);
+    },
+    handleKeyDown(event) {
+      // Проверяем, была ли нажата клавиша Enter и не нажата клавиша Shift
+      if (event.key === 'Enter' && !event.shiftKey) {
+        // Отменяем стандартное поведение (создание новой строки)
+        event.preventDefault();
+
+        // Собираем данные из .view-line span
+        this.collectAndLogData();
+      }
+    },
+    collectAndLogData() {
+      console.log(this.simple)
+
+    },
   },
 
   watch: {
