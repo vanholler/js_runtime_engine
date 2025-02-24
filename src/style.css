@@ -73,11 +73,9 @@ body {
 
 #editor {
   width: 70%;
-  background-color: #282c34;
   flex-grow: 1;
-  border: 0;
+  border: 0 !important;
 }
-
 #console-input {
     overflow-y: auto; /* Вертикальный скроллбар */
     overflow-x: auto; /* Горизонтальный скроллбар */
