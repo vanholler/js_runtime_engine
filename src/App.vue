@@ -4,6 +4,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
 
+
 export default {
   components: {
   },
@@ -15,11 +16,11 @@ export default {
       options: {
         //Monaco Editor Options
       },
-      isExecuting: false
     }
   },
 
-  mounted() {
+  async mounted() {
+
     monaco.editor.defineTheme('my-custom-theme', {
       base: 'vs-dark',
       inherit: true,
@@ -44,25 +45,28 @@ export default {
     });
     this.editor = editor;
 
-     window.addEventListener('resize', () => {
-        editor.layout();
-      });
+    window.addEventListener('resize', () => {
+      editor.layout();
+    });
+
+    // Добавляем обработчик события нажатия клавиши
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        const lines = document.querySelectorAll('.view-line span');
+        let code = '';
+        lines.forEach(line => {
+          code += line.textContent + '\n'; // Собираем текст из каждого span
+        });
+        this.output = code; // Отображаем в console-output
+      }
+    });
   },
   beforeUnmount() {
-      if (this.editor) {
-        this.editor.dispose();
-      }
-    },
+    if (this.editor) {
+      this.editor.dispose();
+    }
+  },
   methods: {
-    onChange(value) {
-      console.log(value);
-    },
-    minimizeWindow() {
-    },
-    maximizeWindow() {
-    },
-    closeWindow() {
-    },
   },
 
   watch: {
@@ -73,15 +77,9 @@ export default {
 
 <template>
   <div id="main">
-    <div id="custom-titlebar">
-      <button id="minimize-btn" @click="minimizeWindow">−</button>
-      <button id="maximize-btn" @click="maximizeWindow">□</button>
-      <button id="close-btn" @click="closeWindow">×</button>
-    </div>
 
     <div id="repl-container">
-      <!-- <div id="editor" style="height: 100%;"></div> -->
-      <div ref="editorContainer" style="width: 100%; height: 400px;"></div>
+      <div id="editor" ref="editorContainer" style="height: 100%;"></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
       <div id="global-scope-display">
       </div>

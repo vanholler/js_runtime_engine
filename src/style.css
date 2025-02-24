@@ -12,45 +12,6 @@ body {
     padding: 5px;
 }
 
-#custom-titlebar button {
-    -webkit-app-region: no-drag;
-    background: none;
-    border: none;
-    color: white;
-    font-size: 20px;
-    margin-left: 10px;
-    cursor: pointer;
-    outline: none;
-}
-
-#custom-titlebar button:hover {
-    background-color: rgba(255, 255, 255, 0.1); /* Подсветка при наведении */
-  }
-
-#custom-titlebar {
-    -webkit-app-region: drag;
-    display: flex;
-    justify-content: flex-end;
-    background-color: #3e4451; /* Цвет фона заголовка */
-    padding: 5px;
-}
-
-#custom-titlebar button {
-    -webkit-app-region: no-drag;
-    background: none;
-    border: none;
-    color: white;
-    font-size: 20px;
-    margin-left: 10px;
-    cursor: pointer;
-    outline: none;
-}
-
-#custom-titlebar button:hover {
-    background-color: rgba(255, 255, 255, 0.1); /* Подсветка при наведении */
-  }
-
-
 #repl-container {
     max-width: 70%;
     height: calc(90vh - 40px); /* Учитываем высоту заголовка */
@@ -72,6 +33,12 @@ body {
 }
 
 #editor {
+  width: 70%;
+  flex-grow: 1;
+  border: 0 !important;
+}
+
+#editorContainer {
   width: 70%;
   flex-grow: 1;
   border: 0 !important;
@@ -123,31 +90,6 @@ body {
     white-space: pre-wrap; /* Сохраняем форматирование текста */
     font-family: monospace; /* Используем моноширинный шрифт, как в консоли */
   }
-  
-  .error {
-    color: red; /* Красный цвет для ошибок */
-  }
-  
-  .warn {
-    color: orange; /* Оранжевый цвет для предупреждений */
-  }
-  
-  .info {
-    color: blue; /* Синий цвет для информации */
-  }
-  
-  .log {
-    color: black; /* Черный цвет для обычных логов */
-  }
-
-
-.keyword { color: #ff79c6; }
-.operator { color: #f8f8f2; }
-.string { color: #f1fa8c; }
-.comment { color: #6272a4; }
-.number { color: #bd93f9; }
-.boolean { color: #ffb86c; }
-
 
 
 
@@ -180,107 +122,3 @@ body {
 }
 
 
-
-
-
-.hljs {
-  width: 95%;
-  height: 100%;
-  background-color: #282c34; /* Цвет фона консоли */
-  color: #fff;
-  overflow-y: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  font-size: 16px;
-  line-height: 1.4rem;
-  overflow: hidden; /* Скрываем скроллбар внутри блока code */
-  white-space: pre; /* Сохраняем форматирование текста */
-}
-
-.hljs::-webkit-scrollbar {
-    display: none; /* Скрываем скроллбар для hljs */
-}
-
-.theme-atom-one-dark pre code.hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 1em
-}
-
-.theme-atom-one-dark code.hljs {
-  padding: 3px 5px
-}
-
-.theme-atom-one-dark .hljs {
-  color: #abb2bf;
-  background: #282c34
-}
-
-.theme-atom-one-dark .hljs-comment,
-.theme-atom-one-dark .hljs-quote {
-  color: #5c6370;
-  font-style: italic
-}
-
-.theme-atom-one-dark .hljs-doctag,
-.theme-atom-one-dark .hljs-formula,
-.theme-atom-one-dark .hljs-keyword {
-  color: #c678dd
-}
-
-.theme-atom-one-dark .hljs-deletion,
-.theme-atom-one-dark .hljs-name,
-.theme-atom-one-dark .hljs-section,
-.theme-atom-one-dark .hljs-selector-tag,
-.theme-atom-one-dark .hljs-subst {
-  color: #e06c75
-}
-
-.theme-atom-one-dark .hljs-literal {
-  color: #56b6c2
-}
-
-.theme-atom-one-dark .hljs-addition,
-.theme-atom-one-dark .hljs-attribute,
-.theme-atom-one-dark .hljs-meta .hljs-string,
-.theme-atom-one-dark .hljs-regexp,
-.theme-atom-one-dark .hljs-string {
-  color: #98c379
-}
-
-.theme-atom-one-dark .hljs-attr,
-.theme-atom-one-dark .hljs-number,
-.theme-atom-one-dark .hljs-selector-attr,
-.theme-atom-one-dark .hljs-selector-class,
-.theme-atom-one-dark .hljs-selector-pseudo,
-.theme-atom-one-dark .hljs-template-variable,
-.theme-atom-one-dark .hljs-type,
-.theme-atom-one-dark .hljs-variable {
-  color: #d19a66
-}
-
-.theme-atom-one-dark .hljs-bullet,
-.theme-atom-one-dark .hljs-link,
-.theme-atom-one-dark .hljs-meta,
-.theme-atom-one-dark .hljs-selector-id,
-.theme-atom-one-dark .hljs-symbol,
-.theme-atom-one-dark .hljs-title {
-  color: #61aeee
-}
-
-.theme-atom-one-dark .hljs-built_in,
-.theme-atom-one-dark .hljs-class .hljs-title,
-.theme-atom-one-dark .hljs-title.class_ {
-  color: #e6c07b
-}
-
-.theme-atom-one-dark .hljs-emphasis {
-  font-style: italic
-}
-
-.theme-atom-one-dark .hljs-strong {
-  font-weight: 700
-}
-
-.theme-atom-one-dark .hljs-link {
-  text-decoration: underline
-}

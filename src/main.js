@@ -12,12 +12,12 @@ function createWindow() {
     height: 800,
     icon: './crc/loggo.ico',
     webPreferences: {
-      nodeIntegration: true, // ВАЖНО: Отключаем nodeIntegration
-      contextIsolation: true, // ВАЖНО: Включаем contextIsolation
+      nodeIntegration: false,
+      contextIsolation: false,
       preload: path.join(__dirname, './preload.js')
     },
     autoHideMenuBar: true, // Скрываем меню
-    frame: false, // Убираем рамку окна
+    frame: true, // Убираем рамку окна
     backgroundColor: '#282c34',
     webSecurity: false,
     enableRemoteModule: true
@@ -38,7 +38,10 @@ function createWindow() {
 
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+});
 
 
 app.on('window-all-closed', () => {
@@ -46,6 +49,7 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
