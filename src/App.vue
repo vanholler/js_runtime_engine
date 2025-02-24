@@ -78,13 +78,31 @@ export default {
         // Отменяем стандартное поведение (создание новой строки)
         event.preventDefault();
 
+        this.output = ''; // Очищаем вывод перед новым запуском
         // Собираем данные из .view-line span
-        this.collectAndLogData();
+        this.makeJsResultOutput();
       }
     },
-    collectAndLogData() {
-      console.log(this.simple)
+    makeJsResultOutput() {
+      // Очищаем предыдущий вывод
+      this.output = '';
+      
+      // Перенаправляем консольные логи
+      const originalConsoleLog = console.log;
+      console.log = (message) => {
+        this.output += message + '\n'; // Добавляем сообщение в вывод
+        originalConsoleLog(message); // Выводим в консоль
+      };
 
+      try {
+        // Выполняем код из переменной simple
+        const result = eval(this.simple); // Выполняем код
+        this.output += result !== undefined ? result : ''; // Добавляем результат выполнения
+      } catch (error) {
+        this.output += error.message; // Обрабатываем ошибки
+      } finally {
+        console.log = originalConsoleLog; // Восстанавливаем оригинальный console.log
+      }
     },
   },
 
