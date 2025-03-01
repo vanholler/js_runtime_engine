@@ -146,52 +146,73 @@ export default {
       }
     },
     displayGlobalVariables() {
+      const ast = esprima.parseScript(this.simple, { range: true });
+
+      // Объект для хранения переменных и их истории
       const variables = {};
 
-      try {
-        // Парсим код в AST (абстрактное синтаксическое дерево)
-        const ast = esprima.parseScript(this.simple, { range: true });
+      // Рекурсивно обходим AST
+      const traverse = (node) => {
+        if (!node) return;
 
-        // Рекурсивно обходим AST
-        const traverse = (node) => {
-          if (!node) return;
+        // Обрабатываем объявления переменных
+        if (node.type === 'VariableDeclaration') {
+          node.declarations.forEach((declaration) => {
+            if (declaration.id && declaration.id.type === 'Identifier') {
+              const variableName = declaration.id.name;
 
-          // Обрабатываем объявления переменных
-          if (node.type === 'VariableDeclaration') {
-            node.declarations.forEach((declaration) => {
-              if (declaration.id && declaration.id.type === 'Identifier') {
-                const variableName = declaration.id.name;
+              // Если переменная инициализирована, получаем её значение
+              if (declaration.init) {
+                try {
+                  // Используем new Function для вычисления значения
+                  const value = new Function(`return ${escodegen.generate(declaration.init)}`)();
 
-                // Если переменная инициализирована, получаем её значение
-                if (declaration.init) {
-                  try {
-                    // Используем new Function для вычисления значения
-                    variables[variableName] = new Function(`return ${escodegen.generate(declaration.init)}`)();
-                  } catch (error) {
-                    console.error(`Ошибка при вычислении значения переменной ${variableName}:`, error);
-                    variables[variableName] = undefined;
+                  // Если переменная еще не существует, создаем ее
+                  if (!variables[variableName]) {
+                    variables[variableName] = { history: [], current: value };
+                  } else {
+                    // Проверяем, изменилось ли значение
+                    if (variables[variableName].current !== value) {
+                      // Добавляем новое значение в историю только если оно изменилось
+                      variables[variableName].history.push(value);
+                      variables[variableName].current = value; // Обновляем текущее значение
+                    }
                   }
-                } else {
-                  variables[variableName] = undefined; // Переменная без инициализации
+                } catch (error) {
+                  console.error(`Ошибка при вычислении значения переменной ${variableName}:`, error);
+                  if (!variables[variableName]) {
+                    variables[variableName] = { history: [], current: undefined };
+                  } else {
+                    // Добавляем undefined в историю, если значение не удалось вычислить
+                    if (variables[variableName].current !== undefined) {
+                      variables[variableName].history.push(undefined);
+                      variables[variableName].current = undefined; // Обновляем текущее значение
+                    }
+                  }
+                }
+              } else {
+                // Если переменная не инициализирована
+                if (!variables[variableName]) {
+                  variables[variableName] = { history: [], current: undefined };
+                } else if (variables[variableName].current !== undefined) {
+                  variables[variableName].current = undefined; // Обновляем текущее значение
                 }
               }
-            });
-          }
-
-          // Рекурсивно обходим дочерние узлы
-          for (const key in node) {
-            if (node[key] && typeof node[key] === 'object') {
-              traverse(node[key]);
             }
+          });
+        }
+
+        // Рекурсивно обходим дочерние узлы
+        for (const key in node) {
+          if (node[key] && typeof node[key] === 'object') {
+            traverse(node[key]);
           }
-        };
+        }
+      };
 
-        traverse(ast);
+      traverse(ast);
 
-        this.globalScope = variables;
-      } catch (error) {
-        console.error('Ошибка при анализе кода:', error);
-      }
+      this.globalScope = variables;
     },
     startResize(event) {
       event.preventDefault();
@@ -242,12 +263,16 @@ export default {
     <div id="repl-container" ref="replContainer">
       <div id="editor" ref="editorContainer" style="height: 100%;"></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
-      <div id="global-scope-display" ref="globalScopeDisplay">
+      <div id="staticCodeData">
+        <div id="global-scope-display" ref="globalScopeDisplay">
         <json-viewer :value="globalScope" :expand-depth=2></json-viewer>
-        
+      </div>
+      <div id="timeout">
+        {{ executionTime }}
+      </div>
       </div>
     </div>
-    {{ executionTime }}
+    
     <div class="resizer" data-direction="vertical" @mousedown="startResize"></div> <!-- Вертикальный разделитель -->
     <div id="console-output" ref="outputContainer">
       <json-viewer :value="output" :expand-depth=1 copyable boxed sort></json-viewer>
@@ -321,5 +346,17 @@ export default {
       }
     }
   }
+}
+
+
+.jv-container.jv-light {
+  background:  none !important;
+  height: -webkit-fill-available;
+}
+
+.jv-container.boxed {
+    border: none !important;
+    border-radius: 6px;
+    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.15);
 }
 </style>
