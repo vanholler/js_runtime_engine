@@ -17,6 +17,8 @@ export default {
     return {
       simple: `console.log("Привет, мир!");\nconst x = 10;\nconst y = 20;\nconsole.log(x + y);`, // Пример кода
       output: '{"language":"json","theme":"my-custom-theme"}', // Переменная для хранения результата выполнения
+      globalScope : {},
+      executionTime: {},
       editor: null, // Переменная для хранения экземпляра редактора
       options: {
         //Monaco Editor Options
@@ -100,23 +102,40 @@ export default {
     makeJsResultOutput() {
       // Очищаем предыдущий вывод
       this.output = '';
+      this.executionTime = {}; // сброс замера
 
       // Перенаправляем консольные логи
       const originalConsoleLog = console.log;
       console.log = (message) => {
         // Форматируем вывод для массивов и объектов
         if (typeof message === 'object') {
-          this.output += JSON.stringify(message, null, 2) + '\n'; // Красивый вывод объектов и массивов
+          this.output += `\n${JSON.stringify(message, null, 2)}\n`; // Объекты выводим отдельно
+        } else if (typeof message === 'string') {
+          this.output += `${message}\n`; // Строки выводим отдельно
         } else {
-          this.output += message + '\n'; // Добавляем сообщение в вывод
+          this.output += `${message}\n`; // Добавляем сообщение в вывод
         }
         originalConsoleLog(message); // Выводим в консоль
       };
 
       try {
-        // Выполняем код из переменной simple
-        const result = eval(this.simple); // Выполняем код
-        this.output += result !== undefined ? JSON.stringify(result, null, 2) : ''; // Добавляем результат выполнения
+        const startTime = performance.now(); // Начинаем отсчет времени
+        const result = eval(this.simple.replace(/console\.log/g, 'this.customConsoleLog')); // Выполняем код с перенаправлением console.log
+        const endTime = performance.now(); // Заканчиваем отсчет времени
+
+        // Вычисление времени выполнения
+        const duration = endTime - startTime;
+        const microseconds = duration * 1000; // Микросекунды (1 мс = 1000 µs)
+        const seconds = duration / 1000; // Секунды (1 мс = 0.001 с)
+        this.executionTime = {
+          full: `${duration} ms`, // Полный формат
+          microseconds: `${microseconds.toFixed(2)} µs`, // Микросекунды
+          seconds: `${seconds.toFixed(6)} s`, // Секунды
+        }
+
+        if (result !== undefined) {
+          this.output += result; // Добавляем результат выполнения
+        }
 
         // Собираем все переменные и их значения
         this.displayGlobalVariables();
@@ -169,9 +188,7 @@ export default {
 
         traverse(ast);
 
-        console.log(variables)
-        // const globalScopeDisplay = this.$refs.globalScopeDisplay;
-        // globalScopeDisplay.innerHTML = JSON.stringify(variables, null, 2);
+        this.globalScope = variables;
       } catch (error) {
         console.error('Ошибка при анализе кода:', error);
       }
@@ -200,6 +217,16 @@ export default {
       // this.readOnlyEditor.setValue(this.output); // Обновляем значение редактора
       console.log("updateReadOnlyEditor")
     },
+    customConsoleLog(message) {
+      // Форматируем вывод для массивов и объектов
+      if (typeof message === 'object') {
+        this.output += `\n${JSON.stringify(message, null, 2)}\n`; // Объекты выводим отдельно
+      } else if (typeof message === 'string') {
+        this.output += `${message}\n`; // Строки выводим отдельно
+      } else {
+        this.output += `${message}\n`; // Добавляем сообщение в вывод
+      }
+    },
   },
   watch: {
     output(newValue) {
@@ -216,10 +243,11 @@ export default {
       <div id="editor" ref="editorContainer" style="height: 100%;"></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
       <div id="global-scope-display" ref="globalScopeDisplay">
-        <json-viewer :value="output" :expand-depth=2></json-viewer>
+        <json-viewer :value="globalScope" :expand-depth=2></json-viewer>
+        
       </div>
     </div>
-
+    {{ executionTime }}
     <div class="resizer" data-direction="vertical" @mousedown="startResize"></div> <!-- Вертикальный разделитель -->
     <div id="console-output" ref="outputContainer">
       <json-viewer :value="output" :expand-depth=1 copyable boxed sort></json-viewer>

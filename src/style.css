@@ -4,6 +4,9 @@ body {
     overflow: hidden; /* Убираем скроллбар для всего окна */
 }
 
+#main {
+    height: 100vh;
+}
 #custom-titlebar {
     -webkit-app-region: drag;
     display: flex;
@@ -28,8 +31,9 @@ body {
     background-color: #3e4451; /* Цвет фона ввода */
     color: #fff;
     font-family: monospace;
-    resize: none; /* Отключаем изменение размера textarea */
-    height: 100vh; /* Фиксированная высота */
+    flex-grow: 1; /* Убедитесь, что это свойство установлено */
+    display: flex; /* Добавлено для корректного заполнения пространства */
+    flex-direction: column; /* Добавлено для вертикального выравнивания содержимого */
 }
 
 #editor {
@@ -74,7 +78,6 @@ body {
 
 #global-scope-display {
     flex-grow: 1;
-    border-left: 3px solid #5f57573e;
     font-family: monospace;
     overflow: hidden;
     height: 100%;
