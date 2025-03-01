@@ -51,6 +51,7 @@
     "to-json-schema": "^0.2.5",
     "vm2": "^3.9.19",
     "vue": "^3.4.21",
+    "vue-json-viewer": "^3.0.4",
     "vue-prism-editor": "^2.0.0-alpha.2",
     "vue3-clipboard": "^1.0.0"
   },

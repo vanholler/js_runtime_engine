@@ -6,13 +6,17 @@ import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
 import * as esprima from 'esprima'; // Импортируем Esprima
 import * as escodegen from 'escodegen'; // Импортируем Escodegen (опционально)
 
+import JsonViewer from 'vue-json-viewer'
+import 'vue-json-viewer/style.css'
+
 export default {
   components: {
+    JsonViewer
   },
   data() {
     return {
       simple: `console.log("Привет, мир!");\nconst x = 10;\nconst y = 20;\nconsole.log(x + y);`, // Пример кода
-      output: '', // Переменная для хранения результата выполнения
+      output: '{"language":"json","theme":"my-custom-theme"}', // Переменная для хранения результата выполнения
       editor: null, // Переменная для хранения экземпляра редактора
       options: {
         //Monaco Editor Options
@@ -32,18 +36,27 @@ export default {
       }
     });
 
-    const container = this.$refs.editorContainer;
+    const inputContainer = this.$refs.editorContainer;
+    const outputContainer = this.$refs.outputContainer;
+    // const helperJsContainer = this.$refs.globalScopeDisplay;
 
-    const editor = monaco.editor.create(container, {
+    const editor = monaco.editor.create(inputContainer, {
       value: this.simple,
       language: 'javascript',
       theme: 'my-custom-theme',
       wordWrap: 'on',
       overflow: 'hidden',
+      padding: {
+        top: 15,
+        bottom: 15,
+      },
       horizontalScrollbarSize: 0,
-      scrollBeyondLastLine: false
+      scrollBeyondLastLine: false,
+
     });
     this.editor = editor;
+    editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
+
 
     // Добавляем обработчик события изменения содержимого модели
     await editor.onDidChangeModelContent(() => {
@@ -183,9 +196,16 @@ export default {
       window.removeEventListener('mousemove', this.resize);
       window.removeEventListener('mouseup', this.stopResize);
     },
+    updateReadOnlyEditor() {
+      // this.readOnlyEditor.setValue(this.output); // Обновляем значение редактора
+      console.log("updateReadOnlyEditor")
+    },
   },
-
-  watch: {},
+  watch: {
+    output(newValue) {
+      this.updateReadOnlyEditor(); // Обновляем редактор при изменении output
+    }
+  },
 }
 </script>
 
@@ -196,11 +216,14 @@ export default {
       <div id="editor" ref="editorContainer" style="height: 100%;"></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
       <div id="global-scope-display" ref="globalScopeDisplay">
+        <json-viewer :value="output" :expand-depth=2></json-viewer>
       </div>
     </div>
 
     <div class="resizer" data-direction="vertical" @mousedown="startResize"></div> <!-- Вертикальный разделитель -->
-    <div id="console-output">{{ output }}</div>
+    <div id="console-output" ref="outputContainer">
+      <json-viewer :value="output" :expand-depth=1 copyable boxed sort></json-viewer>
+    </div>
   </div>
 </template>
 
@@ -217,5 +240,58 @@ export default {
 
 #editor {
   border: 1px solid #ccc;
+}
+
+
+// values are default one from jv-light template
+.my-awesome-json-theme {
+  background-color: #3e4451;
+  white-space: nowrap;
+  color: #525252;
+  font-size: 14px;
+  font-family: Consolas, Menlo, Courier, monospace;
+
+  .jv-ellipsis {
+    color: #999;
+    background-color: #eee;
+    display: inline-block;
+    line-height: 0.9;
+    font-size: 0.9em;
+    padding: 0px 4px 2px 4px;
+    border-radius: 3px;
+    vertical-align: 2px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .jv-button { color: #49b3ff }
+  .jv-key { color: #111111 }
+  .jv-item {
+    &.jv-array { color: #111111 }
+    &.jv-boolean { color: #fc1e70 }
+    &.jv-function { color: #067bca }
+    &.jv-number { color: #fc1e70 }
+    &.jv-number-float { color: #fc1e70 }
+    &.jv-number-integer { color: #fc1e70 }
+    &.jv-object { color: #111111 }
+    &.jv-undefined { color: #e08331 }
+    &.jv-string {
+      color: #42b983;
+      word-break: break-word;
+      white-space: normal;
+    }
+  }
+  .jv-code {
+    .jv-toggle {
+      &:before {
+        padding: 0px 2px;
+        border-radius: 2px;
+      }
+      &:hover {
+        &:before {
+          background: #eee;
+        }
+      }
+    }
+  }
 }
 </style>
