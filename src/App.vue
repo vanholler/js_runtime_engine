@@ -17,7 +17,7 @@ export default {
   data() {
     return {
       simple: `console.log("Привет, мир!");\nconst x = 10;\nconst y = 20;\nconsole.log(x + y);`, // Пример кода
-      output: '{"language":"json","theme":"my-custom-theme"}', // Переменная для хранения результата выполнения
+      output: null, // Переменная для хранения результата выполнения
       globalScope : {},
       executionTime: {},
       editor: null, // Переменная для хранения экземпляра редактора
@@ -134,6 +134,8 @@ export default {
           seconds: `${seconds.toFixed(6)} s`, // Секунды
         }
 
+        this.globalScope.executionTime = this.executionTime;
+
         if (result !== undefined) {
           this.output += result; // Добавляем результат выполнения
         }
@@ -213,7 +215,7 @@ export default {
 
       traverse(ast);
 
-      this.globalScope = variables;
+      this.globalScope.variables = variables;
     },
     startResize(event) {
       event.preventDefault();
@@ -262,14 +264,11 @@ export default {
   <div id="main">
 
     <div id="repl-container" ref="replContainer">
-      <div id="editor" ref="editorContainer" style="height: 100%;"></div>
+      <div id="editor" ref="editorContainer" style=""></div>
       <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
       <div id="staticCodeData">
-        <div id="global-scope-display" ref="globalScopeDisplay">
-        <json-viewer :value="globalScope" :expand-depth=2></json-viewer>
-      </div>
-      <div id="timeout">
-        {{ executionTime }}
+        <div id="global-scope-display" class="" ref="globalScopeDisplay">
+        <json-viewer :value="globalScope" :theme="jv-light" :expand-depth=2 boxed></json-viewer>
       </div>
       </div>
     </div>
@@ -359,5 +358,40 @@ export default {
     border: none !important;
     border-radius: 6px;
     box-shadow: 0 2px 7px rgba(0, 0, 0, 0.15);
+}
+
+
+#global-scope-display {
+  font-size: 14px;
+  font-family: Consolas, Menlo, Courier, monospace;
+  background-color: #1e1e1e; /* Темный фон */
+
+  .jv-object {
+    color: #62bad2;
+  }
+
+  .jv-key {
+    color: #ffffff; /* Белый */
+  }
+
+  .jv-node:after {
+    color: #61dafb; /* Голубой */
+  }
+
+  .jv-number {
+    color: #f39c12; /* Оранжевый */
+  }
+
+  .jv-array {
+    color: #2ecc71; /* Зеленый */
+  }
+
+  .jv-string {
+    color: #42b983;
+  }
+
+  .jv-ellipsis {
+    color: #8b8b74;
+  }
 }
 </style>

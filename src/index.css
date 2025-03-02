@@ -1,7 +1,10 @@
 body {
-  margin: 0; /* Убираем отступы */
-  background-color: #282c34; /* Устанавливаем цвет фона для всего окна */
-  overflow: hidden; /* Убираем скроллбар для всего окна */
+  margin: 0;
+  /* Убираем отступы */
+  background-color: #282c34;
+  /* Устанавливаем цвет фона для всего окна */
+  overflow: hidden;
+  /* Убираем скроллбар для всего окна */
 }
 
 #main {
@@ -10,75 +13,110 @@ body {
   display: flex;
   flex-direction: column;
 }
+
 #custom-titlebar {
   -webkit-app-region: drag;
   display: flex;
   justify-content: flex-end;
-  background-color: #3e4451; /* Цвет фона заголовка */
+  background-color: #3e4451;
+  /* Цвет фона заголовка */
   padding: 5px;
 }
 
 #repl-container {
-  height: calc(80vh - 40px); /* Учитываем высоту заголовка */
+  height: calc(80vh - 40px);
+  /* Учитываем высоту заголовка */
+  width: 100%;
   display: flex;
-  flex-direction:row;
+  flex-direction: row;
   font-family: monospace;
+}
 
+#editor {
+  /* min-width: 20%;
+  min-height: 20%;
+  width: 60%; */
+  flex: 2;
+  /* Занимает 2 части из 3 */
+  min-width: 0;
+  flex-grow: 1;
+  border: 0 !important;
+}
+
+#editorContainer {
+  width: 70%;
+  flex-grow: 1;
+  border: 0 !important;
+}
+
+#staticCodeData {
+  display: flex;
+  flex: 1;
+  /* Занимает 1 часть из 3 */
+  min-width: 15%;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 #console-output {
   padding: 10px;
   border: none;
   outline: none;
-  background-color: #3e4451; /* Цвет фона ввода */
+  background-color: #3e4451;
+  /* Цвет фона ввода */
   color: #fff;
   font-family: monospace;
-  flex-grow: 1; /* Убедитесь, что это свойство установлено */
-  display: flex; /* Добавлено для корректного заполнения пространства */
-  flex-direction: column; /* Добавлено для вертикального выравнивания содержимого */
-  z-index: 99999; /* может и не нужно это */
+  flex-grow: 1;
+  /* Убедитесь, что это свойство установлено */
+  display: flex;
+  /* Добавлено для корректного заполнения пространства */
+  flex-direction: column;
+  /* Добавлено для вертикального выравнивания содержимого */
+  z-index: 99999;
+  /* может и не нужно это */
 }
 
-#editor {
-min-width: 20%;
-min-height: 20%;
-width: 60%;
-flex-grow: 1;
-border: 0 !important;
-}
 
-#editorContainer {
-width: 70%;
-flex-grow: 1;
-border: 0 !important;
-}
+
+
 #console-input {
-  overflow-y: auto; /* Вертикальный скроллбар */
-  overflow-x: auto; /* Горизонтальный скроллбар */
+  overflow-y: auto;
+  /* Вертикальный скроллбар */
+  overflow-x: auto;
+  /* Горизонтальный скроллбар */
   width: 70%;
   flex-grow: 1;
   padding: 10px;
-  background-color: #282c34; /* Цвет фона консоли */
-  color: #fff; /* Цвет текста */
-  white-space: pre-wrap; /* Важно для сохранения форматирования! */
+  background-color: #282c34;
+  /* Цвет фона консоли */
+  color: #fff;
+  /* Цвет текста */
+  white-space: pre-wrap;
+  /* Важно для сохранения форматирования! */
 }
 
 #console-input::-webkit-scrollbar {
-  width: 8px; /* Ширина вертикального скроллбара */
-  height: 8px; /* Высота горизонтального скроллбара */
+  width: 8px;
+  /* Ширина вертикального скроллбара */
+  height: 8px;
+  /* Высота горизонтального скроллбара */
 }
 
 #console-input::-webkit-scrollbar-thumb {
-  background-color: #444; /* Цвет ползунка */
-  border-radius: 4px; /* Закругление углов */
+  background-color: #444;
+  /* Цвет ползунка */
+  border-radius: 4px;
+  /* Закругление углов */
 }
 
 #console-input::-webkit-scrollbar-thumb:hover {
-  background-color: #666; /* Цвет ползунка при наведении */
+  background-color: #666;
+  /* Цвет ползунка при наведении */
 }
 
 #console-input::-webkit-scrollbar-track {
-  background: #282c34; /* Цвет фона скроллбара */
+  background: #282c34;
+  /* Цвет фона скроллбара */
 }
 
 #global-scope-display {
@@ -86,14 +124,20 @@ border: 0 !important;
 }
 
 pre:focus {
-  outline: none; /* Убирает обводку при фокусе */
+  outline: none;
+  /* Убирает обводку при фокусе */
 }
+
 #console-input:focus {
-  outline: none; /* Убирает обводку при фокусе */
+  outline: none;
+  /* Убирает обводку при фокусе */
 }
+
 #console-output {
-  white-space: pre-wrap; /* Сохраняем форматирование текста */
-  font-family: monospace; /* Используем моноширинный шрифт, как в консоли */
+  white-space: pre-wrap;
+  /* Сохраняем форматирование текста */
+  font-family: monospace;
+  /* Используем моноширинный шрифт, как в консоли */
 }
 
 
@@ -102,28 +146,33 @@ pre:focus {
   background: #888;
   opacity: 0;
   transition: opacity 0.2s;
-  box-sizing: border-box; /* Важно! Учитываем border и padding */
-  user-select: none; /* Предотвращает выделение текста */
-  -webkit-user-select: none; /* Для Safari */
-  -ms-user-select: none; /* Для Internet Explorer/Edge */
+  box-sizing: border-box;
+  /* Важно! Учитываем border и padding */
+  user-select: none;
+  /* Предотвращает выделение текста */
+  -webkit-user-select: none;
+  /* Для Safari */
+  -ms-user-select: none;
+  /* Для Internet Explorer/Edge */
 }
 
 .resizer:hover {
-  opacity: 1; /* Показываем при наведении */
+  opacity: 1;
+  /* Показываем при наведении */
 }
 
 /* Горизонтальный разделитель */
 .resizer[data-direction="horizontal"] {
-  width: 10px;
+  width: 5px;
   height: 100%;
-  cursor: ew-resize; /* Курсор изменения ширины */
+  cursor: ew-resize;
+  /* Курсор изменения ширины */
 }
 
 /* Вертикальный разделитель */
 .resizer[data-direction="vertical"] {
   width: 100%;
   height: 5px;
-  cursor: ns-resize; /* Курсор изменения высоты */
+  cursor: ns-resize;
+  /* Курсор изменения высоты */
 }
-
-
