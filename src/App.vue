@@ -9,6 +9,7 @@ import * as escodegen from 'escodegen'; // Импортируем Escodegen (о�
 import JsonViewer from 'vue-json-viewer'
 import 'vue-json-viewer/style.css'
 
+
 export default {
   components: {
     JsonViewer
