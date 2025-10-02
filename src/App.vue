@@ -5,10 +5,10 @@
       <div class="resizer" data-direction="horizontal"></div>
       
       <div id="staticCodeData">
-        <!-- Global Scope (scrollable JSON without arrows) -->
+        <!-- Global Scope (colored JSON) -->
         <div id="global-scope-display" ref="globalScopeDisplay">
           <h3>Global Scope</h3>
-          <pre>{{ JSON.stringify(globalScope, null, 2) }}</pre>
+          <pre v-html="highlightJSON(globalScope)"></pre>
         </div>
 
         <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
@@ -38,10 +38,10 @@
 
     <div class="resizer" data-direction="vertical" @mousedown="startResize"></div>
 
-    <!-- Console Output (scrollable JSON/stringified view) -->
+    <!-- Console Output (colored JSON/stringified view) -->
     <div id="console-output" ref="outputContainer">
       <h3>Console Output</h3>
-      <pre>{{ output }}</pre>
+      <pre v-html="highlightJSON(output)"></pre>
     </div>
   </div>
 </template>
@@ -50,7 +50,6 @@
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
-
 import * as esprima from 'esprima';
 import * as escodegen from 'escodegen';
 
@@ -64,7 +63,7 @@ export default {
       editor: null,
       isSettingsOpen: false,
       activeTab: "about",
-    }
+    };
   },
   async mounted() {
     monaco.editor.defineTheme('my-custom-theme', {
@@ -92,11 +91,7 @@ export default {
 
     this.editor = editor;
     editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
-
-    editor.onDidChangeModelContent(() => {
-      this.simple = editor.getValue();
-    });
-
+    editor.onDidChangeModelContent(() => { this.simple = editor.getValue(); });
     window.addEventListener('resize', () => editor.layout());
     this.setupEditor();
   },
@@ -122,8 +117,8 @@ export default {
       this.executionTime = {};
       const originalConsoleLog = console.log;
       console.log = (message) => {
-        if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
-        else this.output += `${message}\n`;
+        if (typeof message === 'object') this.output += JSON.stringify(message, null, 2);
+        else this.output += message;
         originalConsoleLog(message);
       };
 
@@ -155,7 +150,6 @@ export default {
 
       const traverse = (node) => {
         if (!node) return;
-
         if (node.type === 'VariableDeclaration') {
           node.declarations.forEach((decl) => {
             if (decl.id && decl.id.type === 'Identifier') {
@@ -221,129 +215,57 @@ export default {
       window.removeEventListener('mouseup', this.stopResize); 
     },
     customConsoleLog(message) {
-      if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
-      else this.output += `${message}\n`;
+      if (typeof message === 'object') this.output += JSON.stringify(message, null, 2);
+      else this.output += message;
+    },
+
+    // ✅ Highlight JSON with colors
+    highlightJSON(obj) {
+      let json = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      json = json
+        .replace(/(&|<|>)/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[m]))
+        .replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"):/g, '<span class="jv-key">$1</span>:')
+        .replace(/: "(.*?)"/g, ': <span class="jv-string">"$1"</span>')
+        .replace(/: (\d+)/g, ': <span class="jv-number">$1</span>')
+        .replace(/\b(true|false)\b/g, '<span class="jv-boolean">$1</span>')
+        .replace(/\bnull\b/g, '<span class="jv-null">null</span>')
+        .replace(/\bundefined\b/g, '<span class="jv-undefined">undefined</span>');
+      return json;
     }
   }
 }
 </script>
 
 <style lang="scss">
-#settings-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 1.5em;
-  color: #fff;
-  background: none;
-  border: none;
-  cursor: pointer;
-  z-index: 10;
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-content {
-  background: #1e1e1e;
-  color: #fff;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 95%;
-  padding: 16px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #444;
-  padding-bottom: 8px;
-}
-
-.close-btn {
-  color: #f55;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2em;
-}
-
-.modal-tabs {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  border-bottom: 1px solid #444;
-}
-
+#settings-button { position: absolute; top: 10px; right: 10px; font-size: 1.5em; color: #fff; background: none; border: none; cursor: pointer; z-index: 10; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-content { background: #1e1e1e; color: #fff; border-radius: 8px; width: 400px; max-width: 95%; padding: 16px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 8px; }
+.close-btn { color: #f55; background: none; border: none; cursor: pointer; font-size: 1.2em; }
+.modal-tabs { display: flex; gap: 10px; margin-top: 10px; border-bottom: 1px solid #444; }
 .tab { cursor: pointer; padding: 4px 8px; }
 .active-tab { font-weight: bold; border-bottom: 2px solid #42b983; }
 .modal-body { margin-top: 10px; font-size: 0.9em; }
 
 /* Global Scope + Console */
-#global-scope-display,
-#console-output {
-  background-color: #1e1e1e;
-  color: #f8f8f2;
-  padding: 12px;
-  border-radius: 6px;
-  width: 100%;
-  max-width: 100%;
-  max-height: 750px;
-  overflow: auto;
-  font-family: Consolas, Menlo, Courier, monospace;
-}
+#global-scope-display, #console-output { background-color: #1e1e1e; color: #f8f8f2; padding: 12px; border-radius: 6px; width: 100%; max-width: 100%; max-height: 750px; overflow: auto; font-family: Consolas, Menlo, Courier, monospace; }
 
 /* Scrollbar green */
-#global-scope-display::-webkit-scrollbar,
-#console-output::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-#global-scope-display::-webkit-scrollbar-thumb,
-#console-output::-webkit-scrollbar-thumb {
-  background: #42b983;
-  border-radius: 4px;
-}
-#global-scope-display::-webkit-scrollbar-thumb:hover,
-#console-output::-webkit-scrollbar-thumb:hover {
-  background: #36a372;
-}
+#global-scope-display::-webkit-scrollbar, #console-output::-webkit-scrollbar { width: 8px; height: 8px; }
+#global-scope-display::-webkit-scrollbar-thumb, #console-output::-webkit-scrollbar-thumb { background: #42b983; border-radius: 4px; }
+#global-scope-display::-webkit-scrollbar-thumb:hover, #console-output::-webkit-scrollbar-thumb:hover { background: #36a372; }
 
 /* JSON Viewer Colors */
-#global-scope-display .jv-object,
-#console-output .jv-object { color: #ff79c6; }       /* Pink objects */
-#global-scope-display .jv-key,
-#console-output .jv-key { color: #8be9fd; }         /* Cyan keys */
-#global-scope-display .jv-node:after,
-#console-output .jv-node:after { color: #bd93f9; }  /* Purple node */
-#global-scope-display .jv-number,
-#console-output .jv-number { color: #ffb86c; }     /* Orange numbers */
-#global-scope-display .jv-array,
-#console-output .jv-array { color: #50fa7b; }      /* Green arrays */
-#global-scope-display .jv-string,
-#console-output .jv-string { color: #f1fa8c; }     /* Yellow strings */
-#global-scope-display .jv-boolean,
-#console-output .jv-boolean { color: #ff5555; }    /* Red booleans */
-#global-scope-display .jv-null,
-#console-output .jv-null { color: #6272a4; }       /* Muted blue null */
-#global-scope-display .jv-undefined,
-#console-output .jv-undefined { color: #44475a; } /* Dark gray undefined */
-#global-scope-display .jv-ellipsis,
-#console-output .jv-ellipsis { color: #8b8b74; }
+.jv-object { color: #ff79c6; }       
+.jv-key { color: #8be9fd; }         
+.jv-node:after { color: #bd93f9; }  
+.jv-number { color: #ffb86c; }     
+.jv-array { color: #50fa7b; }      
+.jv-string { color: #f1fa8c; }     
+.jv-boolean { color: #ff5555; }    
+.jv-null { color: #6272a4; }       
+.jv-undefined { color: #44475a; } 
+.jv-ellipsis { color: #8b8b74; }
 
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-size: 14px;
-  line-height: 1.4;
-}
+pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; }
 </style>
