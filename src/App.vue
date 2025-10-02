@@ -16,7 +16,7 @@ export default {
   },
   data() {
     return {
-      simple: `console.log("Привет, мир!");\nconst x = 10;\nconst y = 20;\nconsole.log(x + y);`, // Пример кода
+      simple: `// Press Shift+Enter to execute code.\n// Press Enter to go to next line.\nconsole.log("Привет, мир!");\nconst x = 10;\nconst y = 20;\nconsole.log(x + y);`, // Пример кода
       output: null, // Переменная для хранения результата выполнения
       globalScope : {},
       executionTime: {},
@@ -91,7 +91,7 @@ export default {
     },
     handleKeyDown(event) {
       // Проверяем, была ли нажата клавиша Enter и не нажата клавиша Shift
-      if (event.key === 'Enter' && !event.shiftKey) {
+      if (event.key === 'Enter' && event.shiftKey) {
         // Отменяем стандартное поведение (создание новой строки)
         event.preventDefault();
 
