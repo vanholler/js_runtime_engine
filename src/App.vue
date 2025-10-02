@@ -154,7 +154,10 @@ export default {
       // Объект для хранения переменных и их истории
       const variables = {};
 
-      // Рекурсивно обходим AST
+      // Создаем контекст выполнения для отслеживания переменных
+      const executionContext = {};
+
+      // Рекурсивно обходим AST в порядке выполнения
       const traverse = (node) => {
         if (!node) return;
 
@@ -167,48 +170,92 @@ export default {
               // Если переменная инициализирована, получаем её значение
               if (declaration.init) {
                 try {
-                  // Используем new Function для вычисления значения
-                  const value = new Function(`return ${escodegen.generate(declaration.init)}`)();
+                  // Создаем функцию с контекстом выполнения для вычисления значения
+                  const contextKeys = Object.keys(executionContext);
+                  const contextValues = Object.values(executionContext);
+                  const value = new Function(...contextKeys, `return ${escodegen.generate(declaration.init)}`)(...contextValues);
 
                   // Если переменная еще не существует, создаем ее
                   if (!variables[variableName]) {
                     variables[variableName] = { history: [], current: value };
+                    executionContext[variableName] = value;
                   } else {
-                    // Проверяем, изменилось ли значение
-                    if (variables[variableName].current !== value) {
-                      // Добавляем новое значение в историю только если оно изменилось
-                      variables[variableName].history.push(value);
-                      variables[variableName].current = value; // Обновляем текущее значение
-                    }
+                    // Добавляем предыдущее значение в историю
+                    variables[variableName].history.push(variables[variableName].current);
+                    variables[variableName].current = value;
+                    executionContext[variableName] = value;
                   }
                 } catch (error) {
                   console.error(`Ошибка при вычислении значения переменной ${variableName}:`, error);
                   if (!variables[variableName]) {
                     variables[variableName] = { history: [], current: undefined };
+                    executionContext[variableName] = undefined;
                   } else {
-                    // Добавляем undefined в историю, если значение не удалось вычислить
-                    if (variables[variableName].current !== undefined) {
-                      variables[variableName].history.push(undefined);
-                      variables[variableName].current = undefined; // Обновляем текущее значение
-                    }
+                    variables[variableName].history.push(variables[variableName].current);
+                    variables[variableName].current = undefined;
+                    executionContext[variableName] = undefined;
                   }
                 }
               } else {
                 // Если переменная не инициализирована
                 if (!variables[variableName]) {
                   variables[variableName] = { history: [], current: undefined };
-                } else if (variables[variableName].current !== undefined) {
-                  variables[variableName].current = undefined; // Обновляем текущее значение
+                  executionContext[variableName] = undefined;
+                } else {
+                  variables[variableName].history.push(variables[variableName].current);
+                  variables[variableName].current = undefined;
+                  executionContext[variableName] = undefined;
                 }
               }
             }
           });
         }
 
-        // Рекурсивно обходим дочерние узлы
-        for (const key in node) {
-          if (node[key] && typeof node[key] === 'object') {
-            traverse(node[key]);
+        // Обрабатываем выражения присваивания
+        if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier') {
+          const variableName = node.left.name;
+          
+          try {
+            // Создаем функцию с контекстом выполнения для вычисления значения
+            const contextKeys = Object.keys(executionContext);
+            const contextValues = Object.values(executionContext);
+            const value = new Function(...contextKeys, `return ${escodegen.generate(node.right)}`)(...contextValues);
+
+            // Если переменная существует, добавляем текущее значение в историю
+            if (variables[variableName]) {
+              variables[variableName].history.push(variables[variableName].current);
+              variables[variableName].current = value;
+            } else {
+              // Создаем новую переменную (хотя это не должно происходить в нормальном JS)
+              variables[variableName] = { history: [], current: value };
+            }
+            executionContext[variableName] = value;
+          } catch (error) {
+            console.error(`Ошибка при вычислении значения присваивания ${variableName}:`, error);
+            if (variables[variableName]) {
+              variables[variableName].history.push(variables[variableName].current);
+              variables[variableName].current = undefined;
+            }
+            executionContext[variableName] = undefined;
+          }
+        }
+
+        // Рекурсивно обходим дочерние узлы в правильном порядке
+        if (Array.isArray(node)) {
+          node.forEach(traverse);
+        } else if (typeof node === 'object') {
+          // Обрабатываем узлы в порядке их появления в коде
+          if (node.type === 'Program' && node.body) {
+            node.body.forEach(traverse);
+          } else if (node.type === 'BlockStatement' && node.body) {
+            node.body.forEach(traverse);
+          } else {
+            // Для остальных узлов обходим все свойства
+            for (const key in node) {
+              if (key !== 'type' && key !== 'range' && key !== 'loc' && node[key] && typeof node[key] === 'object') {
+                traverse(node[key]);
+              }
+            }
           }
         }
       };
