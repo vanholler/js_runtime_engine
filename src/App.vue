@@ -1,32 +1,71 @@
+<template>
+  <div id="main">
+    <div id="repl-container" ref="replContainer">
+      <div id="editor" ref="editorContainer"></div>
+      <div class="resizer" data-direction="horizontal"></div>
+      
+      <div id="staticCodeData">
+        <!-- Global Scope (scrollable JSON without arrows) -->
+        <div id="global-scope-display" ref="globalScopeDisplay">
+          <h3>Global Scope</h3>
+          <pre>{{ JSON.stringify(globalScope, null, 2) }}</pre>
+        </div>
+
+        <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
+
+        <div v-if="isSettingsOpen" class="modal-backdrop">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Info / Settings</h2>
+              <button @click="isSettingsOpen = false" class="close-btn">✖</button>
+            </div>
+            <div class="modal-tabs">
+              <span :class="activeTab==='about'?'active-tab':'tab'" @click="activeTab='about'">About</span>
+              <span :class="activeTab==='settings'?'active-tab':'tab'" @click="activeTab='settings'">Settings</span>
+            </div>
+            <div class="modal-body">
+              <div v-if="activeTab==='about'">
+                <p>This project is a JS Runtime Engine built with Vue, Monaco Editor, and Esprima/Escodegen.</p>
+              </div>
+              <div v-else-if="activeTab==='settings'">
+                <p>⚙️ Settings will go here. Suggestions: toggle theme, font size, or auto-run code.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="resizer" data-direction="vertical" @mousedown="startResize"></div>
+
+    <!-- Console Output (scrollable JSON/stringified view) -->
+    <div id="console-output" ref="outputContainer">
+      <h3>Console Output</h3>
+      <pre>{{ output }}</pre>
+    </div>
+  </div>
+</template>
+
 <script>
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
 
-import * as esprima from 'esprima'; // Импортируем Esprima
-import * as escodegen from 'escodegen'; // Импортируем Escodegen (опционально)
-
-import JsonViewer from 'vue-json-viewer'
-import 'vue-json-viewer/style.css'
-
+import * as esprima from 'esprima';
+import * as escodegen from 'escodegen';
 
 export default {
-  components: {
-    JsonViewer
-  },
   data() {
     return {
-      simple: `console.log("Привет, мир!");\nconst x = 10;\nconst y = 20;\nconsole.log(x + y);`, // Пример кода
-      output: null, // Переменная для хранения результата выполнения
-      globalScope : {},
+      simple: `let x = 10;\nx = 20;\nlet y = 30;\nconsole.log(x);`,
+      output: "",
+      globalScope: {},
       executionTime: {},
-      editor: null, // Переменная для хранения экземпляра редактора
-      options: {
-        //Monaco Editor Options
-      },
+      editor: null,
+      isSettingsOpen: false,
+      activeTab: "about",
     }
   },
-
   async mounted() {
     monaco.editor.defineTheme('my-custom-theme', {
       base: 'vs-dark',
@@ -39,428 +78,272 @@ export default {
       }
     });
 
-    const inputContainer = this.$refs.editorContainer;
-    const outputContainer = this.$refs.outputContainer;
-    // const helperJsContainer = this.$refs.globalScopeDisplay;
-
-    const editor = monaco.editor.create(inputContainer, {
+    const editor = monaco.editor.create(this.$refs.editorContainer, {
       value: this.simple,
       language: 'javascript',
       theme: 'my-custom-theme',
       wordWrap: 'on',
       overflow: 'hidden',
-      padding: {
-        top: 15,
-        bottom: 15,
-      },
+      padding: { top: 15, bottom: 15 },
       horizontalScrollbarSize: 0,
       scrollBeyondLastLine: false,
       automaticLayout: true,
     });
+
     this.editor = editor;
     editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
 
-
-    // Добавляем обработчик события изменения содержимого модели
-    await editor.onDidChangeModelContent(() => {
-      this.simple = editor.getValue(); // Обновляем значение переменной simple
+    editor.onDidChangeModelContent(() => {
+      this.simple = editor.getValue();
     });
 
-    window.addEventListener('resize', () => {
-      editor.layout();
-    });
-
+    window.addEventListener('resize', () => editor.layout());
     this.setupEditor();
   },
   beforeUnmount() {
-    if (this.editor) {
-      this.editor.dispose();
-    }
-    // Убираем обработчик события при уничтожении компонента
+    if (this.editor) this.editor.dispose();
     const editorContainer = this.$refs.editorContainer;
-    if (editorContainer) {
-      editorContainer.removeEventListener('keydown', this.handleKeyDown);
-    }
+    if (editorContainer) editorContainer.removeEventListener('keydown', this.handleKeyDown);
   },
   methods: {
     setupEditor() {
       const editorContainer = this.$refs.editorContainer;
-
-      // Добавляем обработчик события keydown
       editorContainer.addEventListener('keydown', this.handleKeyDown);
     },
     handleKeyDown(event) {
-      // Проверяем, была ли нажата клавиша Enter и не нажата клавиша Shift
       if (event.key === 'Enter' && !event.shiftKey) {
-        // Отменяем стандартное поведение (создание новой строки)
         event.preventDefault();
-
-        this.output = ''; // Очищаем вывод перед новым запуском
-        // Собираем данные из .view-line span
+        this.output = '';
         this.makeJsResultOutput();
       }
     },
     makeJsResultOutput() {
-      // Очищаем предыдущий вывод
       this.output = '';
-      this.executionTime = {}; // сброс замера
-
-      // Перенаправляем консольные логи
+      this.executionTime = {};
       const originalConsoleLog = console.log;
       console.log = (message) => {
-        // Форматируем вывод для массивов и объектов
-        if (typeof message === 'object') {
-          this.output += `\n${JSON.stringify(message, null, 2)}\n`; // Объекты выводим отдельно
-        } else if (typeof message === 'string') {
-          this.output += `${message}\n`; // Строки выводим отдельно
-        } else {
-          this.output += `${message}\n`; // Добавляем сообщение в вывод
-        }
-        originalConsoleLog(message); // Выводим в консоль
+        if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
+        else this.output += `${message}\n`;
+        originalConsoleLog(message);
       };
 
       try {
-        const startTime = performance.now(); // Начинаем отсчет времени
-        const result = eval(this.simple.replace(/console\.log/g, 'this.customConsoleLog')); // Выполняем код с перенаправлением console.log
-        const endTime = performance.now(); // Заканчиваем отсчет времени
-
-        // Вычисление времени выполнения
+        const startTime = performance.now();
+        const result = eval(this.simple.replace(/console\.log/g, 'this.customConsoleLog'));
+        const endTime = performance.now();
         const duration = endTime - startTime;
-        const microseconds = duration * 1000; // Микросекунды (1 мс = 1000 µs)
-        const seconds = duration / 1000; // Секунды (1 мс = 0.001 с)
-        this.executionTime = {
-          full: `${duration} ms`, // Полный формат
-          microseconds: `${microseconds.toFixed(2)} µs`, // Микросекунды
-          seconds: `${seconds.toFixed(6)} s`, // Секунды
-        }
 
+        this.executionTime = {
+          full: `${duration} ms`,
+          microseconds: `${(duration * 1000).toFixed(2)} µs`,
+          seconds: `${(duration / 1000).toFixed(6)} s`
+        };
         this.globalScope.executionTime = this.executionTime;
 
-        if (result !== undefined) {
-          this.output += result; // Добавляем результат выполнения
-        }
-
-        // Собираем все переменные и их значения
+        if (result !== undefined) this.output += result;
         this.displayGlobalVariables();
       } catch (error) {
-        this.output += error.message; // Обрабатываем ошибки
+        this.output += error.message;
       } finally {
-        console.log = originalConsoleLog; // Восстанавливаем оригинальный console.log
+        console.log = originalConsoleLog;
       }
     },
     displayGlobalVariables() {
       const ast = esprima.parseScript(this.simple, { range: true });
-
-      // Объект для хранения переменных и их истории
       const variables = {};
-
-      // Создаем контекст выполнения для отслеживания переменных
       const executionContext = {};
 
-      // Рекурсивно обходим AST в порядке выполнения
       const traverse = (node) => {
         if (!node) return;
 
-        // Обрабатываем объявления переменных
         if (node.type === 'VariableDeclaration') {
-          node.declarations.forEach((declaration) => {
-            if (declaration.id && declaration.id.type === 'Identifier') {
-              const variableName = declaration.id.name;
+          node.declarations.forEach((decl) => {
+            if (decl.id && decl.id.type === 'Identifier') {
+              const name = decl.id.name;
+              let value;
+              try {
+                const keys = Object.keys(executionContext);
+                const values = Object.values(executionContext);
+                value = decl.init ? new Function(...keys, `return ${escodegen.generate(decl.init)}`)(...values) : undefined;
+              } catch { value = undefined; }
 
-              // Если переменная инициализирована, получаем её значение
-              if (declaration.init) {
-                try {
-                  // Создаем функцию с контекстом выполнения для вычисления значения
-                  const contextKeys = Object.keys(executionContext);
-                  const contextValues = Object.values(executionContext);
-                  const value = new Function(...contextKeys, `return ${escodegen.generate(declaration.init)}`)(...contextValues);
-
-                  // Если переменная еще не существует, создаем ее
-                  if (!variables[variableName]) {
-                    variables[variableName] = { history: [], current: value };
-                    executionContext[variableName] = value;
-                  } else {
-                    // Добавляем предыдущее значение в историю
-                    variables[variableName].history.push(variables[variableName].current);
-                    variables[variableName].current = value;
-                    executionContext[variableName] = value;
-                  }
-                } catch (error) {
-                  console.error(`Ошибка при вычислении значения переменной ${variableName}:`, error);
-                  if (!variables[variableName]) {
-                    variables[variableName] = { history: [], current: undefined };
-                    executionContext[variableName] = undefined;
-                  } else {
-                    variables[variableName].history.push(variables[variableName].current);
-                    variables[variableName].current = undefined;
-                    executionContext[variableName] = undefined;
-                  }
-                }
+              if (variables[name]) {
+                variables[name].history.push(variables[name].current);
+                variables[name].current = value;
               } else {
-                // Если переменная не инициализирована
-                if (!variables[variableName]) {
-                  variables[variableName] = { history: [], current: undefined };
-                  executionContext[variableName] = undefined;
-                } else {
-                  variables[variableName].history.push(variables[variableName].current);
-                  variables[variableName].current = undefined;
-                  executionContext[variableName] = undefined;
-                }
+                variables[name] = { history: [], current: value };
               }
+              executionContext[name] = value;
             }
           });
         }
 
-        // Обрабатываем выражения присваивания
         if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier') {
-          const variableName = node.left.name;
-          
+          const name = node.left.name;
           try {
-            // Создаем функцию с контекстом выполнения для вычисления значения
-            const contextKeys = Object.keys(executionContext);
-            const contextValues = Object.values(executionContext);
-            const value = new Function(...contextKeys, `return ${escodegen.generate(node.right)}`)(...contextValues);
+            const keys = Object.keys(executionContext);
+            const values = Object.values(executionContext);
+            const value = new Function(...keys, `return ${escodegen.generate(node.right)}`)(...values);
 
-            // Если переменная существует, добавляем текущее значение в историю
-            if (variables[variableName]) {
-              variables[variableName].history.push(variables[variableName].current);
-              variables[variableName].current = value;
+            if (variables[name]) {
+              variables[name].history.push(variables[name].current);
+              variables[name].current = value;
             } else {
-              // Создаем новую переменную (хотя это не должно происходить в нормальном JS)
-              variables[variableName] = { history: [], current: value };
+              variables[name] = { history: [], current: value };
             }
-            executionContext[variableName] = value;
-          } catch (error) {
-            console.error(`Ошибка при вычислении значения присваивания ${variableName}:`, error);
-            if (variables[variableName]) {
-              variables[variableName].history.push(variables[variableName].current);
-              variables[variableName].current = undefined;
-            }
-            executionContext[variableName] = undefined;
-          }
+            executionContext[name] = value;
+          } catch { executionContext[name] = undefined; if (variables[name]) variables[name].current = undefined; }
         }
 
-        // Рекурсивно обходим дочерние узлы в правильном порядке
-        if (Array.isArray(node)) {
-          node.forEach(traverse);
-        } else if (typeof node === 'object') {
-          // Обрабатываем узлы в порядке их появления в коде
-          if (node.type === 'Program' && node.body) {
-            node.body.forEach(traverse);
-          } else if (node.type === 'BlockStatement' && node.body) {
-            node.body.forEach(traverse);
-          } else {
-            // Для остальных узлов обходим все свойства
-            for (const key in node) {
-              if (key !== 'type' && key !== 'range' && key !== 'loc' && node[key] && typeof node[key] === 'object') {
-                traverse(node[key]);
-              }
-            }
-          }
+        if (Array.isArray(node)) node.forEach(traverse);
+        else if (typeof node === 'object') {
+          if (node.body) node.body.forEach(traverse);
+          for (const key in node) if (node[key] && typeof node[key] === 'object') traverse(node[key]);
         }
       };
 
       traverse(ast);
-
       this.globalScope.variables = variables;
     },
-    startResize(event) {
-      event.preventDefault();
-      window.addEventListener('mousemove', this.resize);
-      window.addEventListener('mouseup', this.stopResize);
+    startResize(event) { 
+      event.preventDefault(); 
+      window.addEventListener('mousemove', this.resize); 
+      window.addEventListener('mouseup', this.stopResize); 
     },
-    resize(event) {
-      const replContainer = this.$refs.replContainer;
-      const editorContainer = this.$refs.editorContainer; // Получаем ссылку на редактор
-      const newHeight = event.clientY - replContainer.getBoundingClientRect().top;
-
-      // Устанавливаем новую высоту для repl-container и editor
-      replContainer.style.height = `${newHeight}px`;
-      editorContainer.style.height = 'auto'; // Устанавливаем высоту в auto
-
-
+    resize(event) { 
+      const repl = this.$refs.replContainer; 
+      const editor = this.$refs.editorContainer; 
+      repl.style.height = `${event.clientY - repl.getBoundingClientRect().top}px`; 
+      editor.style.height = 'auto'; 
     },
-    stopResize() {
-      window.removeEventListener('mousemove', this.resize);
-      window.removeEventListener('mouseup', this.stopResize);
-    },
-    updateReadOnlyEditor() {
-      // this.readOnlyEditor.setValue(this.output); // Обновляем значение редактора
-      console.log("updateReadOnlyEditor")
+    stopResize() { 
+      window.removeEventListener('mousemove', this.resize); 
+      window.removeEventListener('mouseup', this.stopResize); 
     },
     customConsoleLog(message) {
-      // Форматируем вывод для массивов и объектов
-      if (typeof message === 'object') {
-        this.output += `\n${JSON.stringify(message, null, 2)}\n`; // Объекты выводим отдельно
-      } else if (typeof message === 'string') {
-        this.output += `${message}\n`; // Строки выводим отдельно
-      } else {
-        this.output += `${message}\n`; // Добавляем сообщение в вывод
-      }
-    },
-  },
-  watch: {
-    output(newValue) {
-      this.updateReadOnlyEditor(); // Обновляем редактор при изменении output
+      if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
+      else this.output += `${message}\n`;
     }
-  },
+  }
 }
 </script>
 
-<template>
-  <div id="main">
-
-    <div id="repl-container" ref="replContainer">
-      <div id="editor" ref="editorContainer" style=""></div>
-      <div class="resizer" data-direction="horizontal"></div> <!-- Горизонтальный разделитель -->
-      <div id="staticCodeData">
-        <div id="global-scope-display" class="" ref="globalScopeDisplay">
-        <json-viewer :value="globalScope" :theme="jv-light" :expand-depth=2 boxed></json-viewer>
-      </div>
-      </div>
-    </div>
-    
-    <div class="resizer" data-direction="vertical" @mousedown="startResize"></div> <!-- Вертикальный разделитель -->
-    <div id="console-output" ref="outputContainer">
-      <json-viewer :value="output" :expand-depth=1 copyable boxed sort></json-viewer>
-    </div>
-  </div>
-</template>
-
-
 <style lang="scss">
-html, body, #app, #main {
-  height: 100%;
-  min-height: 0;
+#settings-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 1.5em;
+  color: #fff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 10;
 }
 
-#repl-container {
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
   display: flex;
-  flex-direction: row;
-  min-height: 0; /* важно для корректного расчёта высоты во флексе */
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
 }
 
-#editor {
-  flex: 1 1 auto;   /* занимает всё оставшееся пространство */
-  // min-height: 0;    /* не выпирает за пределы */
-  // height: auto;
-  // overflow: hidden; /* без внутренних скроллов контейнера */
+.modal-content {
+  background: #1e1e1e;
+  color: #fff;
+  border-radius: 8px;
+  width: 400px;
+  max-width: 95%;
+  padding: 16px;
 }
 
-#staticCodeData {
-  flex: 0 0 auto;   /* занимает контентную высоту, не отбирает гибко место у редактора */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #444;
+  padding-bottom: 8px;
 }
 
-.theme-atom-one-dark pre code.hljs {
-  padding: 0;
+.close-btn {
+  color: #f55;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2em;
 }
 
-.resizer {
-  cursor: ew-resize;
-  z-index: 99999;
+.modal-tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  border-bottom: 1px solid #444;
 }
 
-#editor {
-  border: 1px solid #ccc;
-}
+.tab { cursor: pointer; padding: 4px 8px; }
+.active-tab { font-weight: bold; border-bottom: 2px solid #42b983; }
+.modal-body { margin-top: 10px; font-size: 0.9em; }
 
-
-// values are default one from jv-light template
-.my-awesome-json-theme {
-  background-color: #3e4451;
-  white-space: nowrap;
-  color: #525252;
-  font-size: 14px;
+/* Global Scope + Console */
+#global-scope-display,
+#console-output {
+  background-color: #1e1e1e;
+  color: #f8f8f2;
+  padding: 12px;
+  border-radius: 6px;
+  width: 100%;
+  max-width: 100%;
+  max-height: 750px;
+  overflow: auto;
   font-family: Consolas, Menlo, Courier, monospace;
-
-  .jv-ellipsis {
-    color: #999;
-    background-color: #eee;
-    display: inline-block;
-    line-height: 0.9;
-    font-size: 0.9em;
-    padding: 0px 4px 2px 4px;
-    border-radius: 3px;
-    vertical-align: 2px;
-    cursor: pointer;
-    user-select: none;
-  }
-  .jv-button { color: #49b3ff }
-  .jv-key { color: #111111 }
-  .jv-item {
-    &.jv-array { color: #111111 }
-    &.jv-boolean { color: #fc1e70 }
-    &.jv-function { color: #067bca }
-    &.jv-number { color: #fc1e70 }
-    &.jv-number-float { color: #fc1e70 }
-    &.jv-number-integer { color: #fc1e70 }
-    &.jv-object { color: #111111 }
-    &.jv-undefined { color: #e08331 }
-    &.jv-string {
-      color: #42b983;
-      word-break: break-word;
-      white-space: normal;
-    }
-  }
-  .jv-code {
-    .jv-toggle {
-      &:before {
-        padding: 0px 2px;
-        border-radius: 2px;
-      }
-      &:hover {
-        &:before {
-          background: #eee;
-        }
-      }
-    }
-  }
 }
 
-
-.jv-container.jv-light {
-  background:  none !important;
-  height: -webkit-fill-available;
+/* Scrollbar green */
+#global-scope-display::-webkit-scrollbar,
+#console-output::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+#global-scope-display::-webkit-scrollbar-thumb,
+#console-output::-webkit-scrollbar-thumb {
+  background: #42b983;
+  border-radius: 4px;
+}
+#global-scope-display::-webkit-scrollbar-thumb:hover,
+#console-output::-webkit-scrollbar-thumb:hover {
+  background: #36a372;
 }
 
-.jv-container.boxed {
-    border: none !important;
-    border-radius: 6px;
-    box-shadow: 0 2px 7px rgba(0, 0, 0, 0.15);
-}
+/* JSON Viewer Colors */
+#global-scope-display .jv-object,
+#console-output .jv-object { color: #ff79c6; }       /* Pink objects */
+#global-scope-display .jv-key,
+#console-output .jv-key { color: #8be9fd; }         /* Cyan keys */
+#global-scope-display .jv-node:after,
+#console-output .jv-node:after { color: #bd93f9; }  /* Purple node */
+#global-scope-display .jv-number,
+#console-output .jv-number { color: #ffb86c; }     /* Orange numbers */
+#global-scope-display .jv-array,
+#console-output .jv-array { color: #50fa7b; }      /* Green arrays */
+#global-scope-display .jv-string,
+#console-output .jv-string { color: #f1fa8c; }     /* Yellow strings */
+#global-scope-display .jv-boolean,
+#console-output .jv-boolean { color: #ff5555; }    /* Red booleans */
+#global-scope-display .jv-null,
+#console-output .jv-null { color: #6272a4; }       /* Muted blue null */
+#global-scope-display .jv-undefined,
+#console-output .jv-undefined { color: #44475a; } /* Dark gray undefined */
+#global-scope-display .jv-ellipsis,
+#console-output .jv-ellipsis { color: #8b8b74; }
 
-
-#global-scope-display {
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
   font-size: 14px;
-  font-family: Consolas, Menlo, Courier, monospace;
-  background-color: #1e1e1e; /* Темный фон */
-
-  .jv-object {
-    color: #62bad2;
-  }
-
-  .jv-key {
-    color: #ffffff; /* Белый */
-  }
-
-  .jv-node:after {
-    color: #61dafb; /* Голубой */
-  }
-
-  .jv-number {
-    color: #f39c12; /* Оранжевый */
-  }
-
-  .jv-array {
-    color: #2ecc71; /* Зеленый */
-  }
-
-  .jv-string {
-    color: #42b983;
-  }
-
-  .jv-ellipsis {
-    color: #8b8b74;
-  }
+  line-height: 1.4;
 }
 </style>
