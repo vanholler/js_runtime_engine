@@ -1,3 +1,51 @@
+<template>
+  <div id="main">
+    <div id="repl-container" ref="replContainer">
+      <div id="editor" ref="editorContainer"></div>
+      <div class="resizer" data-direction="horizontal"></div>
+      
+      <div id="staticCodeData">
+        <!-- Global Scope (scrollable JSON without arrows) -->
+        <div id="global-scope-display" ref="globalScopeDisplay">
+          <h3>Global Scope</h3>
+          <pre>{{ JSON.stringify(globalScope, null, 2) }}</pre>
+        </div>
+
+        <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
+
+        <div v-if="isSettingsOpen" class="modal-backdrop">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Info / Settings</h2>
+              <button @click="isSettingsOpen = false" class="close-btn">✖</button>
+            </div>
+            <div class="modal-tabs">
+              <span :class="activeTab==='about'?'active-tab':'tab'" @click="activeTab='about'">About</span>
+              <span :class="activeTab==='settings'?'active-tab':'tab'" @click="activeTab='settings'">Settings</span>
+            </div>
+            <div class="modal-body">
+              <div v-if="activeTab==='about'">
+                <p>This project is a JS Runtime Engine built with Vue, Monaco Editor, and Esprima/Escodegen.</p>
+              </div>
+              <div v-else-if="activeTab==='settings'">
+                <p>⚙️ Settings will go here. Suggestions: toggle theme, font size, or auto-run code.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="resizer" data-direction="vertical" @mousedown="startResize"></div>
+
+    <!-- Console Output (scrollable JSON/stringified view) -->
+    <div id="console-output" ref="outputContainer">
+      <h3>Console Output</h3>
+      <pre>{{ output }}</pre>
+    </div>
+  </div>
+</template>
+
 <script>
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
@@ -6,15 +54,11 @@ import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
 import * as esprima from 'esprima';
 import * as escodegen from 'escodegen';
 
-import JsonViewer from 'vue-json-viewer';
-import 'vue-json-viewer/style.css';
-
 export default {
-  components: { JsonViewer },
   data() {
     return {
       simple: `let x = 10;\nx = 20;\nlet y = 30;\nconsole.log(x);`,
-      output: null,
+      output: "",
       globalScope: {},
       executionTime: {},
       editor: null,
@@ -112,7 +156,6 @@ export default {
       const traverse = (node) => {
         if (!node) return;
 
-        // Handle variable declarations
         if (node.type === 'VariableDeclaration') {
           node.declarations.forEach((decl) => {
             if (decl.id && decl.id.type === 'Identifier') {
@@ -135,7 +178,6 @@ export default {
           });
         }
 
-        // Handle assignments
         if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier') {
           const name = node.left.name;
           try {
@@ -153,7 +195,6 @@ export default {
           } catch { executionContext[name] = undefined; if (variables[name]) variables[name].current = undefined; }
         }
 
-        // Recursively traverse child nodes
         if (Array.isArray(node)) node.forEach(traverse);
         else if (typeof node === 'object') {
           if (node.body) node.body.forEach(traverse);
@@ -164,9 +205,21 @@ export default {
       traverse(ast);
       this.globalScope.variables = variables;
     },
-    startResize(event) { event.preventDefault(); window.addEventListener('mousemove', this.resize); window.addEventListener('mouseup', this.stopResize); },
-    resize(event) { const repl = this.$refs.replContainer; const editor = this.$refs.editorContainer; repl.style.height = `${event.clientY - repl.getBoundingClientRect().top}px`; editor.style.height = 'auto'; },
-    stopResize() { window.removeEventListener('mousemove', this.resize); window.removeEventListener('mouseup', this.stopResize); },
+    startResize(event) { 
+      event.preventDefault(); 
+      window.addEventListener('mousemove', this.resize); 
+      window.addEventListener('mouseup', this.stopResize); 
+    },
+    resize(event) { 
+      const repl = this.$refs.replContainer; 
+      const editor = this.$refs.editorContainer; 
+      repl.style.height = `${event.clientY - repl.getBoundingClientRect().top}px`; 
+      editor.style.height = 'auto'; 
+    },
+    stopResize() { 
+      window.removeEventListener('mousemove', this.resize); 
+      window.removeEventListener('mouseup', this.stopResize); 
+    },
     customConsoleLog(message) {
       if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
       else this.output += `${message}\n`;
@@ -174,55 +227,6 @@ export default {
   }
 }
 </script>
-
-<template>
-  <div id="main">
-    <div id="repl-container" ref="replContainer">
-      <div id="editor" ref="editorContainer"></div>
-      <div class="resizer" data-direction="horizontal"></div>
-      
-      <div id="staticCodeData">
-        <div id="global-scope-display" ref="globalScopeDisplay">
-          <json-viewer 
-            :value="globalScope" 
-            theme="my-awesome-json-theme" 
-            :expand-depth="2" 
-            boxed>
-          </json-viewer>
-        </div>
-
-        <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
-
-        <div v-if="isSettingsOpen" class="modal-backdrop">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h2>Info / Settings</h2>
-              <button @click="isSettingsOpen = false" class="close-btn">✖</button>
-            </div>
-            <div class="modal-tabs">
-              <span :class="activeTab==='about'?'active-tab':'tab'" @click="activeTab='about'">About</span>
-              <span :class="activeTab==='settings'?'active-tab':'tab'" @click="activeTab='settings'">Settings</span>
-            </div>
-            <div class="modal-body">
-              <div v-if="activeTab==='about'">
-                <p>This project is a JS Runtime Engine built with Vue, Monaco Editor, and Esprima/Escodegen.</p>
-              </div>
-              <div v-else-if="activeTab==='settings'">
-                <p>⚙️ Settings will go here. Suggestions: toggle theme, font size, or auto-run code.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <div class="resizer" data-direction="vertical" @mousedown="startResize"></div>
-    <div id="console-output" ref="outputContainer">
-      <json-viewer :value="output" :expand-depth="1" copyable boxed sort></json-viewer>
-    </div>
-  </div>
-</template>
 
 <style lang="scss">
 #settings-button {
@@ -283,20 +287,63 @@ export default {
 .active-tab { font-weight: bold; border-bottom: 2px solid #42b983; }
 .modal-body { margin-top: 10px; font-size: 0.9em; }
 
-/* JSON Viewer Dark Theme */
-.my-awesome-json-theme {
+/* Global Scope + Console */
+#global-scope-display,
+#console-output {
   background-color: #1e1e1e;
   color: #f8f8f2;
+  padding: 12px;
+  border-radius: 6px;
+  width: 100%;
+  max-width: 100%;
+  max-height: 750px;
+  overflow: auto;
   font-family: Consolas, Menlo, Courier, monospace;
-  font-size: 14px;
+}
 
-  .jv-key { color: #61dafb; }
-  .jv-string { color: #42b983; }
-  .jv-number { color: #f39c12; }
-  .jv-boolean { color: #fc1e70; }
-  .jv-null { color: #ff79c6; }
-  .jv-undefined { color: #e08331; }
-  .jv-object, .jv-array { color: #f8f8f2; }
-  .jv-ellipsis { color: #999; }
+/* Scrollbar green */
+#global-scope-display::-webkit-scrollbar,
+#console-output::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+#global-scope-display::-webkit-scrollbar-thumb,
+#console-output::-webkit-scrollbar-thumb {
+  background: #42b983;
+  border-radius: 4px;
+}
+#global-scope-display::-webkit-scrollbar-thumb:hover,
+#console-output::-webkit-scrollbar-thumb:hover {
+  background: #36a372;
+}
+
+/* JSON Viewer Colors */
+#global-scope-display .jv-object,
+#console-output .jv-object { color: #ff79c6; }       /* Pink objects */
+#global-scope-display .jv-key,
+#console-output .jv-key { color: #8be9fd; }         /* Cyan keys */
+#global-scope-display .jv-node:after,
+#console-output .jv-node:after { color: #bd93f9; }  /* Purple node */
+#global-scope-display .jv-number,
+#console-output .jv-number { color: #ffb86c; }     /* Orange numbers */
+#global-scope-display .jv-array,
+#console-output .jv-array { color: #50fa7b; }      /* Green arrays */
+#global-scope-display .jv-string,
+#console-output .jv-string { color: #f1fa8c; }     /* Yellow strings */
+#global-scope-display .jv-boolean,
+#console-output .jv-boolean { color: #ff5555; }    /* Red booleans */
+#global-scope-display .jv-null,
+#console-output .jv-null { color: #6272a4; }       /* Muted blue null */
+#global-scope-display .jv-undefined,
+#console-output .jv-undefined { color: #44475a; } /* Dark gray undefined */
+#global-scope-display .jv-ellipsis,
+#console-output .jv-ellipsis { color: #8b8b74; }
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 14px;
+  line-height: 1.4;
 }
 </style>
