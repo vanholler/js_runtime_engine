@@ -5,6 +5,9 @@
 ### Description
 JS Play is a desktop application for working with JavaScript code. It’s similar to a browser DevTools console: edit and run code, inspect output and execution time, analyze the AST, and track variable value changes and current global state with clear visualization.
 
+### Contributing
+All suggestions for improving the application are welcome. Feel free to open an Issue or submit a Pull Request. Please review the [contributing guide](CONTRIBUTING.md) before you get started.
+
 ## Stack
 - Electron ^34 (electron-forge)
 - Vite ^5
