@@ -55,7 +55,7 @@ export default {
       },
       horizontalScrollbarSize: 0,
       scrollBeyondLastLine: false,
-
+      automaticLayout: true,
     });
     this.editor = editor;
     editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
@@ -282,13 +282,35 @@ export default {
 
 
 <style lang="scss">
+html, body, #app, #main {
+  height: 100%;
+  min-height: 0;
+}
+
+#repl-container {
+  display: flex;
+  flex-direction: row;
+  min-height: 0; /* важно для корректного расчёта высоты во флексе */
+}
+
+#editor {
+  flex: 1 1 auto;   /* занимает всё оставшееся пространство */
+  // min-height: 0;    /* не выпирает за пределы */
+  // height: auto;
+  // overflow: hidden; /* без внутренних скроллов контейнера */
+}
+
+#staticCodeData {
+  flex: 0 0 auto;   /* занимает контентную высоту, не отбирает гибко место у редактора */
+}
+
 .theme-atom-one-dark pre code.hljs {
   padding: 0;
 }
 
 .resizer {
   cursor: ew-resize;
-  /* Изменение курсора при наведении */
+  z-index: 99999;
 }
 
 #editor {
