@@ -1,11 +1,11 @@
 # JS Play (Electron + Vite + Vue)
 
-Небольшой десктоп‑инструмент для экспериментов с JavaScript-кодом:
-- Редактор кода на базе Monaco.
-- Быстрый запуск через Vite + Electron.
-- Парсинг AST (Esprima) и вычисление значений (Escodegen) с отображением глобального состояния в `json-viewer`.
+![Preview](src/sourses/preview.png)
 
-## Стек
+### Description
+JS Play is a desktop application for working with JavaScript code. It’s similar to a browser DevTools console: edit and run code, inspect output and execution time, analyze the AST, and track variable value changes and current global state with clear visualization.
+
+## Stack
 - Electron ^34 (electron-forge)
 - Vite ^5
 - Vue ^3
@@ -14,46 +14,44 @@
 - vue-json-viewer
 - Prism.js / highlight.js
 
-## Требования
-- Node.js LTS
-- npm (или pnpm/yarn)
+## Requirements
+- Node.js LTS (from v19.0.0 )
+- npm ( from 8.19.2 )
 
-## Установка
+## Installation
 ```bash
 npm install
 ```
 
-## Команды
-- Запуск в dev-режиме:
+## Scripts
+- Start in dev mode:
 ```bash
 npm run start
 ```
 
-- Сборка пакета приложения:
+- Package the app:
 ```bash
 npm run package
 ```
 
-- Создание инсталлятора/дистрибутива (для вашей ОС):
+- Make installer/distributable:
 ```bash
 npm run make
 ```
 
-- Публикация (если настроено):
+- Publish (if configured):
 ```bash
 npm run publish
 ```
 
-- Линт (заглушка):
+- Lint (stub):
 ```bash
 npm run lint
 ```
 
-## Что внутри
-- `Monaco` для редактирования кода.
-- Разбор кода в AST (`esprima`), генерация и вычисление выражений (`escodegen`).
-- Отображение глобального состояния и метрик выполнения в `vue-json-viewer`.
-- Готово к упаковке в настольное приложение через `electron-forge`.
-
-## Лицензия
-MIT
+## What’s inside
+- `Monaco` for code editing.
+- AST parsing (`esprima`), expression generation/evaluation (`escodegen`).
+- `console.log` capture and formatting, execution time measurement.
+- Global state and variable change history visualization via `vue-json-viewer`.
+- Ready for desktop packaging
