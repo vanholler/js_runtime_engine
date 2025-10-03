@@ -3,12 +3,26 @@
     <div id="repl-container" ref="replContainer">
       <div id="editor" ref="editorContainer"></div>
       <div class="resizer" data-direction="horizontal"></div>
-      
+
       <div id="staticCodeData">
-        <!-- Global Scope (scrollable JSON without arrows) -->
         <div id="global-scope-display" ref="globalScopeDisplay">
           <h3>Global Scope</h3>
-          <pre>{{ JSON.stringify(globalScope, null, 2) }}</pre>
+
+          <!-- Expand/Collapse Controls -->
+          <div class="scope-controls">
+            <button @click="collapseAll">Collapse All</button>
+            <button @click="expandAll">Expand All</button>
+          </div>
+
+          <!-- JSON Viewer -->
+          <json-viewer
+            :value="globalScope"
+            :expand-depth="expandDepth"
+            theme="dark"
+            copyable
+            sort
+            :key="`gv-${expandDepth}-${globalScopeVersion}`"
+          />
         </div>
 
         <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
@@ -38,10 +52,13 @@
 
     <div class="resizer" data-direction="vertical" @mousedown="startResize"></div>
 
-    <!-- Console Output (scrollable JSON/stringified view) -->
     <div id="console-output" ref="outputContainer">
       <h3>Console Output</h3>
-      <pre>{{ output }}</pre>
+
+      <!-- Copy Button -->
+      <button class="copy-btn" @click="copyConsoleOutput">Copy</button>
+
+      <pre v-html="highlightJSON(output)"></pre>
     </div>
   </div>
 </template>
@@ -50,11 +67,13 @@
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
-
 import * as esprima from 'esprima';
 import * as escodegen from 'escodegen';
+import JsonViewer from 'vue-json-viewer';
+import 'vue-json-viewer/style.css';
 
 export default {
+  components: { JsonViewer },
   data() {
     return {
       simple: `let x = 10;\nx = 20;\nlet y = 30;\nconsole.log(x);`,
@@ -64,7 +83,9 @@ export default {
       editor: null,
       isSettingsOpen: false,
       activeTab: "about",
-    }
+      expandDepth: 2,
+      globalScopeVersion: 0,
+    };
   },
   async mounted() {
     monaco.editor.defineTheme('my-custom-theme', {
@@ -92,11 +113,7 @@ export default {
 
     this.editor = editor;
     editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
-
-    editor.onDidChangeModelContent(() => {
-      this.simple = editor.getValue();
-    });
-
+    editor.onDidChangeModelContent(() => { this.simple = editor.getValue(); });
     window.addEventListener('resize', () => editor.layout());
     this.setupEditor();
   },
@@ -122,14 +139,16 @@ export default {
       this.executionTime = {};
       const originalConsoleLog = console.log;
       console.log = (message) => {
-        if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
-        else this.output += `${message}\n`;
+        if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
+        else this.output += message + "\n";
         originalConsoleLog(message);
       };
 
+      const boundCustomConsoleLog = this.customConsoleLog.bind(this);
+
       try {
         const startTime = performance.now();
-        const result = eval(this.simple.replace(/console\.log/g, 'this.customConsoleLog'));
+        const result = eval(this.simple.replace(/console\.log/g, 'boundCustomConsoleLog')); 
         const endTime = performance.now();
         const duration = endTime - startTime;
 
@@ -138,7 +157,8 @@ export default {
           microseconds: `${(duration * 1000).toFixed(2)} µs`,
           seconds: `${(duration / 1000).toFixed(6)} s`
         };
-        this.globalScope.executionTime = this.executionTime;
+
+        this.globalScope = { ...this.globalScope, executionTime: this.executionTime };
 
         if (result !== undefined) this.output += result;
         this.displayGlobalVariables();
@@ -153,58 +173,90 @@ export default {
       const variables = {};
       const executionContext = {};
 
+      const handleVariable = (decl) => {
+        if (!decl.id || decl.id.type !== 'Identifier') return;
+        const name = decl.id.name;
+        let value;
+
+        try {
+          const keys = Object.keys(executionContext);
+          const values = Object.values(executionContext);
+          value = decl.init ? new Function(...keys, `return ${escodegen.generate(decl.init)}`)(...values) : undefined;
+        } catch {
+          value = undefined;
+        }
+
+        if (variables[name]) {
+          if (variables[name].current !== value) variables[name].history.push(variables[name].current);
+          variables[name].current = value;
+        } else {
+          variables[name] = { history: [], current: value };
+        }
+
+        executionContext[name] = value;
+      };
+
+      const handleAssignment = (node) => {
+        if (!node.left || node.left.type !== 'Identifier') return;
+        const name = node.left.name;
+        let value;
+
+        try {
+          const keys = Object.keys(executionContext);
+          const values = Object.values(executionContext);
+          value = new Function(...keys, `return ${escodegen.generate(node.right)}`)(...values);
+        } catch {
+          value = undefined;
+        }
+
+        if (variables[name]) {
+          if (variables[name].current !== value) variables[name].history.push(variables[name].current);
+          variables[name].current = value;
+        } else {
+          variables[name] = { history: [], current: value };
+        }
+
+        executionContext[name] = value;
+      };
+
       const traverse = (node) => {
         if (!node) return;
+        if (Array.isArray(node)) return node.forEach(traverse);
+        if (typeof node !== 'object') return;
 
-        if (node.type === 'VariableDeclaration') {
-          node.declarations.forEach((decl) => {
-            if (decl.id && decl.id.type === 'Identifier') {
-              const name = decl.id.name;
-              let value;
-              try {
-                const keys = Object.keys(executionContext);
-                const values = Object.values(executionContext);
-                value = decl.init ? new Function(...keys, `return ${escodegen.generate(decl.init)}`)(...values) : undefined;
-              } catch { value = undefined; }
+        if (node.type === 'VariableDeclaration') node.declarations.forEach(handleVariable);
+        else if (node.type === 'AssignmentExpression') handleAssignment(node);
 
-              if (variables[name]) {
-                variables[name].history.push(variables[name].current);
-                variables[name].current = value;
-              } else {
-                variables[name] = { history: [], current: value };
-              }
-              executionContext[name] = value;
-            }
-          });
+        for (const key in node) {
+          if (key === 'body') continue;
+          if (node[key] && typeof node[key] === 'object') traverse(node[key]);
         }
 
-        if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier') {
-          const name = node.left.name;
-          try {
-            const keys = Object.keys(executionContext);
-            const values = Object.values(executionContext);
-            const value = new Function(...keys, `return ${escodegen.generate(node.right)}`)(...values);
-
-            if (variables[name]) {
-              variables[name].history.push(variables[name].current);
-              variables[name].current = value;
-            } else {
-              variables[name] = { history: [], current: value };
-            }
-            executionContext[name] = value;
-          } catch { executionContext[name] = undefined; if (variables[name]) variables[name].current = undefined; }
-        }
-
-        if (Array.isArray(node)) node.forEach(traverse);
-        else if (typeof node === 'object') {
-          if (node.body) node.body.forEach(traverse);
-          for (const key in node) if (node[key] && typeof node[key] === 'object') traverse(node[key]);
-        }
+        if (node.body) traverse(node.body);
       };
 
       traverse(ast);
-      this.globalScope.variables = variables;
+
+      this.globalScope = { ...this.globalScope, variables };
+      this.globalScopeVersion++;
     },
+
+    collapseAll() { this.expandDepth = 0; },
+    expandAll() { this.expandDepth = Math.max(1, this.computeMaxDepth(this.globalScope)); },
+    computeMaxDepth(obj) {
+      const seen = new WeakSet();
+      const depth = (o) => {
+        if (o === null || typeof o !== 'object') return 0;
+        if (seen.has(o)) return 0;
+        seen.add(o);
+        let maxChild = 0;
+        if (Array.isArray(o)) for (const v of o) maxChild = Math.max(maxChild, depth(v));
+        else for (const k of Object.keys(o)) try { maxChild = Math.max(maxChild, depth(o[k])); } catch {}
+        return maxChild + 1;
+      };
+      try { const computed = depth(obj); return Number.isFinite(computed) ? computed : 2; } catch { return 2; }
+    },
+
     startResize(event) { 
       event.preventDefault(); 
       window.addEventListener('mousemove', this.resize); 
@@ -212,85 +264,53 @@ export default {
     },
     resize(event) { 
       const repl = this.$refs.replContainer; 
-      const editor = this.$refs.editorContainer; 
       repl.style.height = `${event.clientY - repl.getBoundingClientRect().top}px`; 
-      editor.style.height = 'auto'; 
+      this.$refs.editorContainer.style.height = 'auto'; 
     },
     stopResize() { 
       window.removeEventListener('mousemove', this.resize); 
       window.removeEventListener('mouseup', this.stopResize); 
     },
     customConsoleLog(message) {
-      if (typeof message === 'object') this.output += `\n${JSON.stringify(message, null, 2)}\n`;
-      else this.output += `${message}\n`;
+      if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
+      else this.output += message + "\n";
+    },
+    highlightJSON(obj) {
+      let json = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      json = json
+        .replace(/(&|<|>)/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[m]))
+        .replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"):/g, '<span class="jv-key">$1</span>:')
+        .replace(/: "(.*?)"/g, ': <span class="jv-string">"$1"</span>')
+        .replace(/: (\d+)/g, ': <span class="jv-number">$1</span>')
+        .replace(/\b(true|false)\b/g, '<span class="jv-boolean">$1</span>')
+        .replace(/\bnull\b/g, '<span class="jv-null">null</span>')
+        .replace(/\bundefined\b/g, '<span class="jv-undefined">undefined</span>');
+      return json;
+    },
+    copyConsoleOutput() {
+      navigator.clipboard.writeText(this.output).then(() => {
+        alert('Console output copied!');
+      }).catch(err => console.error('Copy failed', err));
     }
   }
-}
+};
 </script>
 
 <style lang="scss">
-#settings-button {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  font-size: 1.5em;
-  color: #fff;
-  background: none;
-  border: none;
-  cursor: pointer;
-  z-index: 10;
-}
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-content {
-  background: #1e1e1e;
-  color: #fff;
-  border-radius: 8px;
-  width: 400px;
-  max-width: 95%;
-  padding: 16px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #444;
-  padding-bottom: 8px;
-}
-
-.close-btn {
-  color: #f55;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2em;
-}
-
-.modal-tabs {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  border-bottom: 1px solid #444;
-}
-
+#settings-button { position: absolute; top: 10px; right: 10px; font-size: 1.5em; color: #fff; background: none; border: none; cursor: pointer; z-index: 10; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-content { background: #1e1e1e; color: #fff; border-radius: 8px; width: 400px; max-width: 95%; padding: 16px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 8px; }
+.close-btn { color: #f55; background: none; border: none; cursor: pointer; font-size: 1.2em; }
+.modal-tabs { display: flex; gap: 10px; margin-top: 10px; border-bottom: 1px solid #444; }
 .tab { cursor: pointer; padding: 4px 8px; }
 .active-tab { font-weight: bold; border-bottom: 2px solid #42b983; }
 .modal-body { margin-top: 10px; font-size: 0.9em; }
 
 /* Global Scope + Console */
-#global-scope-display,
-#console-output {
-  background-color: #1e1e1e;
+#global-scope-display, #console-output {
+  position: relative;
+  background-color: #111;
   color: #f8f8f2;
   padding: 12px;
   border-radius: 6px;
@@ -301,49 +321,53 @@ export default {
   font-family: Consolas, Menlo, Courier, monospace;
 }
 
-/* Scrollbar green */
-#global-scope-display::-webkit-scrollbar,
-#console-output::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-#global-scope-display::-webkit-scrollbar-thumb,
-#console-output::-webkit-scrollbar-thumb {
+/* Small Copy Button on top-right corner */
+#console-output .copy-btn {
+  position: absolute;
+  top: 30px;
+  right: 35px;
   background: #42b983;
+  border: none;
   border-radius: 4px;
+  color: #fff;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
 }
-#global-scope-display::-webkit-scrollbar-thumb:hover,
-#console-output::-webkit-scrollbar-thumb:hover {
-  background: #36a372;
+#console-output .copy-btn:hover {
+  background: rgba(0,0,0,0.6);
 }
+
+/* Expand/Collapse Buttons */
+.scope-controls { margin-bottom: 6px; display: flex; gap: 6px; }
+.scope-controls button, #console-output .copy-btn {
+  background: #42b983;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.scope-controls button:hover, #console-output .copy-btn:hover { background: rgba(0,0,0,0.6); }
+
+/* Scrollbar */
+#global-scope-display::-webkit-scrollbar, #console-output::-webkit-scrollbar { width: 8px; height: 8px; }
+#global-scope-display::-webkit-scrollbar-thumb, #console-output::-webkit-scrollbar-thumb { background: #42b983; border-radius: 4px; }
+#global-scope-display::-webkit-scrollbar-thumb:hover, #console-output::-webkit-scrollbar-thumb:hover { background: #36a372; }
 
 /* JSON Viewer Colors */
-#global-scope-display .jv-object,
-#console-output .jv-object { color: #ff79c6; }       /* Pink objects */
-#global-scope-display .jv-key,
-#console-output .jv-key { color: #8be9fd; }         /* Cyan keys */
-#global-scope-display .jv-node:after,
-#console-output .jv-node:after { color: #bd93f9; }  /* Purple node */
-#global-scope-display .jv-number,
-#console-output .jv-number { color: #ffb86c; }     /* Orange numbers */
-#global-scope-display .jv-array,
-#console-output .jv-array { color: #50fa7b; }      /* Green arrays */
-#global-scope-display .jv-string,
-#console-output .jv-string { color: #f1fa8c; }     /* Yellow strings */
-#global-scope-display .jv-boolean,
-#console-output .jv-boolean { color: #ff5555; }    /* Red booleans */
-#global-scope-display .jv-null,
-#console-output .jv-null { color: #6272a4; }       /* Muted blue null */
-#global-scope-display .jv-undefined,
-#console-output .jv-undefined { color: #44475a; } /* Dark gray undefined */
-#global-scope-display .jv-ellipsis,
-#console-output .jv-ellipsis { color: #8b8b74; }
+.jv-object { color: #ff79c6; }       
+.jv-key { color: #8be9fd; }         
+.jv-node:after { color: #bd93f9; }  
+.jv-number { color: #ffb86c; }     
+.jv-array { color: #50fa7b; }      
+.jv-string { color: #f1fa8c; }     
+.jv-boolean { color: #ff5555; }    
+.jv-null { color: #6272a4; }       
+.jv-undefined { color: #44475a; } 
+.jv-ellipsis { color: #8b8b74; }
 
-pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-size: 14px;
-  line-height: 1.4;
-}
+pre { margin: 0; white-space: pre-wrap; word-wrap: break-word; font-size: 14px; line-height: 1.4; }
 </style>
