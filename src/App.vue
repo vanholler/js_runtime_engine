@@ -135,6 +135,13 @@ export default {
     this.$watch('fontSize', (newVal) => {
       editor.updateOptions({ fontSize: newVal });
     });
+    
+    // Ensure theme is applied correctly on mount
+    this.$nextTick(() => {
+      if (this.editor) {
+        this.editor.updateOptions({ theme: this.darkThemeEnabled ? 'my-custom-theme' : 'vs' });
+      }
+    });
   },
   beforeUnmount() {
     if (this.editor) this.editor.dispose();
