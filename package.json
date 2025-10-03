@@ -29,19 +29,20 @@
     "@electron/fuses": "^1.8.0",
     "@vitejs/plugin-vue": "^5.2.1",
     "electron": "34.3.0",
-    "vite": "^5.4.14",
-    "sass": "^1.33.0"
+    "sass": "^1.33.0",
+    "vite": "^5.4.14"
   },
   "dependencies": {
     "@editorjs/editorjs": "^2.30.8",
     "electron-squirrel-startup": "^1.0.1",
-    "vue": "^3.5.13",
-    "monaco-editor": "^0.52.2",
-    "monaco-editor-vue": "^1.0.10",
     "escodegen": "^2.1.0",
     "esprima": "^4.0.1",
     "highlight.js": "^11.9.0",
+    "monaco-editor": "^0.52.2",
+    "monaco-editor-vue": "^1.0.10",
     "prismjs": "^1.29.0",
+    "vue": "^3.5.13",
+    "vue-json-pretty": "^2.5.0",
     "vue-json-viewer": "^3.0.4",
     "vue-prism-editor": "^2.0.0-alpha.2"
   }
