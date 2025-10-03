@@ -8,13 +8,11 @@
         <div id="global-scope-display" ref="globalScopeDisplay">
           <h3>Global Scope</h3>
 
-          <!-- Expand/Collapse Controls -->
           <div class="scope-controls">
             <button @click="collapseAll">Collapse All</button>
             <button @click="expandAll">Expand All</button>
           </div>
 
-          <!-- JSON Viewer -->
           <json-viewer
             :value="globalScope"
             :expand-depth="expandDepth"
@@ -25,8 +23,11 @@
           />
         </div>
 
-        <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
-
+        <div id="controls">
+          <button id="run-button" @click="makeJsResultOutput" title="Run Code">▶️</button>
+          <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
+        </div>
+        
         <div v-if="isSettingsOpen" class="modal-backdrop">
           <div class="modal-content">
             <div class="modal-header">
@@ -55,7 +56,6 @@
     <div id="console-output" ref="outputContainer">
       <h3>Console Output</h3>
 
-      <!-- Copy Button -->
       <button class="copy-btn" @click="copyConsoleOutput">Copy</button>
 
       <pre v-html="highlightJSON(output)"></pre>
@@ -115,45 +115,41 @@ export default {
     editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
     editor.onDidChangeModelContent(() => { this.simple = editor.getValue(); });
     window.addEventListener('resize', () => editor.layout());
-    this.setupEditor();
+    
+    // REMOVED: this.setupEditor() call
   },
   beforeUnmount() {
     if (this.editor) this.editor.dispose();
-    const editorContainer = this.$refs.editorContainer;
-    if (editorContainer) editorContainer.removeEventListener('keydown', this.handleKeyDown);
+    // REMOVED: code to remove event listener
   },
   methods: {
-    setupEditor() {
-      const editorContainer = this.$refs.editorContainer;
-      editorContainer.addEventListener('keydown', this.handleKeyDown);
-    },
-    handleKeyDown(event) {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        this.output = '';
-        this.makeJsResultOutput();
-      }
-    },
+    // REMOVED: setupEditor() method
+    // REMOVED: handleKeyDown() method
+    
     makeJsResultOutput() {
       this.output = '';
       this.executionTime = {};
       const originalConsoleLog = console.log;
-      console.log = (message) => {
-        if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
-        else this.output += message + "\n";
-        originalConsoleLog(message);
-      };
-
-      const boundCustomConsoleLog = this.customConsoleLog.bind(this);
+      
+      // Temporarily redirect console.log to our custom method
+      // We must use a global redirection (`window.console.log`) 
+      // instead of overriding the function pointer (`console.log`) 
+      // if `eval` is used and expecting a global function.
+      const originalWindowConsoleLog = window.console.log;
+      window.console.log = this.customConsoleLog.bind(this);
 
       try {
         const startTime = performance.now();
-        const result = eval(this.simple.replace(/console\.log/g, 'boundCustomConsoleLog')); 
+        
+        // Execute code directly. No string replacement needed anymore 
+        // because we redirected the global window.console.log.
+        const result = eval(this.simple); 
+        
         const endTime = performance.now();
         const duration = endTime - startTime;
 
         this.executionTime = {
-          full: `${duration} ms`,
+          full: `${duration.toFixed(2)} ms`, // Fixed toFixed for display consistency
           microseconds: `${(duration * 1000).toFixed(2)} µs`,
           seconds: `${(duration / 1000).toFixed(6)} s`
         };
@@ -165,85 +161,108 @@ export default {
       } catch (error) {
         this.output += error.message;
       } finally {
-        console.log = originalConsoleLog;
+        // IMPORTANT: Restore the original console.log function
+        window.console.log = originalWindowConsoleLog;
       }
     },
     displayGlobalVariables() {
-      const ast = esprima.parseScript(this.simple, { range: true });
-      const variables = {};
-      const executionContext = {};
+      try {
+        const ast = esprima.parseScript(this.simple, { range: true });
+        const variables = {};
+        const executionContext = {};
 
-      const handleVariable = (decl) => {
-        if (!decl.id || decl.id.type !== 'Identifier') return;
-        const name = decl.id.name;
-        let value;
+        const handleFunctionDeclaration = (node) => {
+            if (!node.id || node.id.type !== 'Identifier') return;
+            const name = node.id.name;
 
-        try {
-          const keys = Object.keys(executionContext);
-          const values = Object.values(executionContext);
-          value = decl.init ? new Function(...keys, `return ${escodegen.generate(decl.init)}`)(...values) : undefined;
-        } catch {
-          value = undefined;
-        }
+            if (!variables[name]) {
+                variables[name] = { history: [], current: 'function' };
+            }
+        };
 
-        if (variables[name]) {
-          if (variables[name].current !== value) variables[name].history.push(variables[name].current);
-          variables[name].current = value;
-        } else {
-          variables[name] = { history: [], current: value };
-        }
+        const handleVariable = (decl) => {
+          if (!decl.id || decl.id.type !== 'Identifier') return;
+          const name = decl.id.name;
+          let value;
 
-        executionContext[name] = value;
-      };
+          try {
+            const keys = Object.keys(executionContext);
+            const values = Object.values(executionContext);
+            // Re-evaluating variable initialization using Function constructor
+            value = decl.init ? new Function(...keys, `return ${escodegen.generate(decl.init)}`)(...values) : undefined;
+          } catch {
+            value = undefined;
+          }
 
-      const handleAssignment = (node) => {
-        if (!node.left || node.left.type !== 'Identifier') return;
-        const name = node.left.name;
-        let value;
+          if (variables[name]) {
+            if (variables[name].current !== value) variables[name].history.push(variables[name].current);
+            variables[name].current = value;
+          } else {
+            variables[name] = { history: [], current: value };
+          }
 
-        try {
-          const keys = Object.keys(executionContext);
-          const values = Object.values(executionContext);
-          value = new Function(...keys, `return ${escodegen.generate(node.right)}`)(...values);
-        } catch {
-          value = undefined;
-        }
+          executionContext[name] = value;
+        };
 
-        if (variables[name]) {
-          if (variables[name].current !== value) variables[name].history.push(variables[name].current);
-          variables[name].current = value;
-        } else {
-          variables[name] = { history: [], current: value };
-        }
+        const handleAssignment = (node) => {
+          if (!node.left || node.left.type !== 'Identifier') return;
+          const name = node.left.name;
+          let value;
 
-        executionContext[name] = value;
-      };
+          try {
+            const keys = Object.keys(executionContext);
+            const values = Object.values(executionContext);
+            // Re-evaluating assignment expression
+            value = new Function(...keys, `return ${escodegen.generate(node.right)}`)(...values);
+          } catch {
+            value = undefined;
+          }
 
-      const traverse = (node) => {
-        if (!node) return;
-        if (Array.isArray(node)) return node.forEach(traverse);
-        if (typeof node !== 'object') return;
+          if (variables[name]) {
+            if (variables[name].current !== value) variables[name].history.push(variables[name].current);
+            variables[name].current = value;
+          } else {
+            variables[name] = { history: [], current: value };
+          }
 
-        if (node.type === 'VariableDeclaration') node.declarations.forEach(handleVariable);
-        else if (node.type === 'AssignmentExpression') handleAssignment(node);
+          executionContext[name] = value;
+        };
 
-        for (const key in node) {
-          if (key === 'body') continue;
-          if (node[key] && typeof node[key] === 'object') traverse(node[key]);
-        }
+        const traverse = (node) => {
+          if (!node) return;
+          if (Array.isArray(node)) return node.forEach(traverse);
+          if (typeof node !== 'object') return;
+          
+          if (node.type === 'FunctionDeclaration') handleFunctionDeclaration(node);
+          else if (node.type === 'VariableDeclaration') node.declarations.forEach(handleVariable);
+          else if (node.type === 'AssignmentExpression') handleAssignment(node);
 
-        if (node.body) traverse(node.body);
-      };
+          for (const key in node) {
+            if (key === 'body' || key === 'declarations') continue;
+            if (node[key] && typeof node[key] === 'object') traverse(node[key]);
+          }
 
-      traverse(ast);
+          if (node.body) traverse(node.body);
+        };
 
-      this.globalScope = { ...this.globalScope, variables };
-      this.globalScopeVersion++;
+        traverse(ast);
+
+        this.globalScope = { ...this.globalScope, variables };
+        this.globalScopeVersion++;
+      } catch (error) {
+         console.error("Error parsing AST:", error);
+         // You might want to update globalScope to show the parsing error here
+      }
     },
-
+    
+    // Global Scope Controls
     collapseAll() { this.expandDepth = 0; },
-    expandAll() { this.expandDepth = Math.max(1, this.computeMaxDepth(this.globalScope)); },
+    expandAll() { 
+      // Compute max depth to fully expand nested objects/arrays
+      this.expandDepth = Math.max(1, this.computeMaxDepth(this.globalScope)); 
+    },
     computeMaxDepth(obj) {
+      // Logic for computing max depth (copied from your original code)
       const seen = new WeakSet();
       const depth = (o) => {
         if (o === null || typeof o !== 'object') return 0;
@@ -257,6 +276,7 @@ export default {
       try { const computed = depth(obj); return Number.isFinite(computed) ? computed : 2; } catch { return 2; }
     },
 
+    // Resizing Logic
     startResize(event) { 
       event.preventDefault(); 
       window.addEventListener('mousemove', this.resize); 
@@ -271,11 +291,14 @@ export default {
       window.removeEventListener('mousemove', this.resize); 
       window.removeEventListener('mouseup', this.stopResize); 
     },
+    
+    // Console Output Logic
     customConsoleLog(message) {
       if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
       else this.output += message + "\n";
     },
     highlightJSON(obj) {
+      // JSON Highlighting logic (copied from your original code)
       let json = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
       json = json
         .replace(/(&|<|>)/g, (m) => ({ '&':'&amp;','<':'&lt;','>':'&gt;' }[m]))
@@ -288,6 +311,7 @@ export default {
       return json;
     },
     copyConsoleOutput() {
+      // Copy to clipboard logic (copied from your original code)
       navigator.clipboard.writeText(this.output).then(() => {
         alert('Console output copied!');
       }).catch(err => console.error('Copy failed', err));
@@ -297,7 +321,44 @@ export default {
 </script>
 
 <style lang="scss">
-#settings-button { position: absolute; top: 10px; right: 10px; font-size: 1.5em; color: #fff; background: none; border: none; cursor: pointer; z-index: 10; }
+/* --- CORE LAYOUT --- */
+#main { display: flex; flex-direction: column; height: 100vh; background-color: #282a36; }
+#repl-container { display: flex; flex-direction: row; flex-grow: 1; min-height: 50%; }
+#editor, #staticCodeData { flex-grow: 1; flex-basis: 0; padding: 0; position: relative; }
+#editor { background-color: #282a36; }
+.resizer { background: #44475a; z-index: 10; }
+.resizer[data-direction="horizontal"] { width: 4px; cursor: col-resize; }
+.resizer[data-direction="vertical"] { height: 4px; cursor: row-resize; }
+#staticCodeData { display: flex; flex-direction: column; padding: 0 10px 10px 10px; background-color: #282a36; }
+#global-scope-display { flex-grow: 1; margin-bottom: 10px; }
+#console-output { min-height: 50px; flex-grow: 1; padding: 12px; }
+
+/* --- ICON BUTTONS (Settings and Run) --- */
+#controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    display: flex; 
+    gap: 8px; 
+}
+
+#settings-button, #run-button { 
+    /* Uniform icon styling */
+    font-size: 1.5em; 
+    color: #f8f8f2; /* White/Dracula foreground color */
+    background: none; /* No background color */
+    border: none; 
+    padding: 0; /* Remove padding for tight icon display */
+    cursor: pointer; 
+    line-height: 1;
+}
+
+#settings-button:hover, #run-button:hover { 
+    color: #42b983; /* Change color on hover to green/accent */
+}
+
+/* --- MODAL AND SCOPE CONTROLS (Existing Styles) --- */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 50; }
 .modal-content { background: #1e1e1e; color: #fff; border-radius: 8px; width: 400px; max-width: 95%; padding: 16px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 8px; }
@@ -310,7 +371,7 @@ export default {
 /* Global Scope + Console */
 #global-scope-display, #console-output {
   position: relative;
-  background-color: #111;
+  background-color: #1e1e1e; /* Changed from #111 for consistency with component background */
   color: #f8f8f2;
   padding: 12px;
   border-radius: 6px;
@@ -326,7 +387,7 @@ export default {
   position: absolute;
   top: 30px;
   right: 35px;
-  background: #42b983;
+  background: #44475a; /* Consistent color for small utility buttons */
   border: none;
   border-radius: 4px;
   color: #fff;
@@ -335,14 +396,12 @@ export default {
   cursor: pointer;
   line-height: 1;
 }
-#console-output .copy-btn:hover {
-  background: rgba(0,0,0,0.6);
-}
+#console-output .copy-btn:hover { background: #6272a4; }
 
 /* Expand/Collapse Buttons */
 .scope-controls { margin-bottom: 6px; display: flex; gap: 6px; }
-.scope-controls button, #console-output .copy-btn {
-  background: #42b983;
+.scope-controls button {
+  background: #44475a; /* Consistent color for small utility buttons */
   border: none;
   border-radius: 4px;
   color: #fff;
@@ -350,7 +409,7 @@ export default {
   cursor: pointer;
   font-size: 12px;
 }
-.scope-controls button:hover, #console-output .copy-btn:hover { background: rgba(0,0,0,0.6); }
+.scope-controls button:hover { background: #6272a4; }
 
 /* Scrollbar */
 #global-scope-display::-webkit-scrollbar, #console-output::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -358,14 +417,15 @@ export default {
 #global-scope-display::-webkit-scrollbar-thumb:hover, #console-output::-webkit-scrollbar-thumb:hover { background: #36a372; }
 
 /* JSON Viewer Colors */
-.jv-object { color: #ff79c6; }       
-.jv-key { color: #8be9fd; }         
-.jv-node:after { color: #bd93f9; }  
-.jv-number { color: #ffb86c; }     
-.jv-array { color: #50fa7b; }      
-.jv-string { color: #f1fa8c; }     
-.jv-boolean { color: #ff5555; }    
-.jv-null { color: #6272a4; }       
+/* (Styles for vue-json-viewer theme="dark") */
+.jv-object { color: #ff79c6; } 
+.jv-key { color: #8be9fd; } 
+.jv-node:after { color: #bd93f9; } 
+.jv-number { color: #ffb86c; } 
+.jv-array { color: #50fa7b; }  
+.jv-string { color: #f1fa8c; } 
+.jv-boolean { color: #ff5555; } 
+.jv-null { color: #6272a4; } 
 .jv-undefined { color: #44475a; } 
 .jv-ellipsis { color: #8b8b74; }
 
