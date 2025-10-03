@@ -104,6 +104,9 @@ export default {
       activeTab: "about",
       expandDepth: 2,
       globalScopeVersion: 0,
+      autoRunEnabled: true,
+      darkThemeEnabled: true,
+      fontSize: 14,
     };
   },
   async mounted() {
