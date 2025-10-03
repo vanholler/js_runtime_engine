@@ -1,10 +1,12 @@
 <template>
   <div id="main">
     <div id="repl-container" ref="replContainer">
-      <div id="editor" ref="editorContainer"></div>
-      <div class="resizer" data-direction="horizontal"></div>
+      <div id="editorParent" ref="editorParentContainer">
+        <div id="editor" ref="editorContainer"></div>
+        <div class="resizer" data-direction="horizontal" @mousedown="startHorizontalResize"></div>
 
-      <div id="staticCodeData">
+      </div>
+      <div id="staticCodeData" ref="horizontalContainer">
         <div id="global-scope-display" ref="globalScopeDisplay">
           <h3>Global Scope</h3>
 
@@ -15,14 +17,8 @@
           </div>
 
           <!-- JSON Viewer -->
-          <json-viewer
-            :value="globalScope"
-            :expand-depth="expandDepth"
-            theme="dark"
-            copyable
-            sort
-            :key="`gv-${expandDepth}-${globalScopeVersion}`"
-          />
+          <json-viewer :value="globalScope" :expand-depth="expandDepth" theme="dark" copyable sort
+            :key="`gv-${expandDepth}-${globalScopeVersion}`" />
         </div>
 
         <button id="settings-button" @click="isSettingsOpen = true" title="About & Settings">⚙️</button>
@@ -50,7 +46,7 @@
       </div>
     </div>
 
-    <div class="resizer" data-direction="vertical" @mousedown="startResize"></div>
+    <div class="resizer" data-direction="vertical" @mousedown="startVerticalResize"></div>
 
     <div id="console-output" ref="outputContainer">
       <h3>Console Output</h3>
@@ -257,20 +253,49 @@ export default {
       try { const computed = depth(obj); return Number.isFinite(computed) ? computed : 2; } catch { return 2; }
     },
 
-    startResize(event) { 
-      event.preventDefault(); 
-      window.addEventListener('mousemove', this.resize); 
-      window.addEventListener('mouseup', this.stopResize); 
+    startVerticalResize(event) {
+      event.preventDefault();
+      window.addEventListener('mousemove', this.VerticalResize);
+      window.addEventListener('mouseup', this.stopVerticalResize);
     },
-    resize(event) { 
-      const repl = this.$refs.replContainer; 
-      repl.style.height = `${event.clientY - repl.getBoundingClientRect().top}px`; 
-      this.$refs.editorContainer.style.height = 'auto'; 
+
+    VerticalResize(event) {
+      const repl = this.$refs.replContainer;
+      repl.style.height = `${event.clientY - repl.getBoundingClientRect().top}px`;
+      this.$refs.editorContainer.style.height = 'auto';
     },
-    stopResize() { 
-      window.removeEventListener('mousemove', this.resize); 
-      window.removeEventListener('mouseup', this.stopResize); 
+    stopVerticalResize() {
+      window.removeEventListener('mousemove', this.VerticalResize);
+      window.removeEventListener('mouseup', this.stopVerticalResize);
     },
+    startVerticalResize(event) {
+      event.preventDefault();
+      window.addEventListener('mousemove', this.VerticalResize);
+      window.addEventListener('mouseup', this.stopVerticalResize);
+    },
+    HorizontalResize(event) {
+
+      const editorParentBox = this.$refs.editorParentContainer;
+      const editorBox = this.$refs.editorContainer;
+
+      const newWidth = event.clientX;
+
+      // Update editor section width
+      editorBox.style.width = `${newWidth}px`;
+      editorParentBox.style.width = `${newWidth}px`
+
+    },
+    stopHorizontalResize() {
+      window.removeEventListener('mousemove', this.HorizontalResize);
+      window.removeEventListener('mouseup', this.stopHorizontalResize);
+    },
+    startHorizontalResize(event) {
+      event.preventDefault();
+      window.addEventListener('mousemove', this.HorizontalResize);
+      window.addEventListener('mouseup', this.stopHorizontalResize);
+    },
+
+
     customConsoleLog(message) {
       if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
       else this.output += message + "\n";

@@ -35,27 +35,25 @@ body {
 #editor {
   /* min-width: 20%;
   min-height: 20%;
-  width: 60%; */
-  flex: 2;
   /* Занимает 2 части из 3 */
-  min-width: 0;
-  flex-grow: 1;
-  border: 0 !important;
+  width: 100%;
+  min-width: 20%;
+
 }
 
-#editorContainer {
-  width: 70%;
-  flex-grow: 1;
-  border: 0 !important;
+#editorParent {
+  display: flex;
+  max-width: 100%;
+  width: 100%;
 }
+
 
 #staticCodeData {
   display: flex;
-  flex: 1;
+  max-width: 1000%;
+  width: 100%;
   /* Занимает 1 часть из 3 */
-  min-width: 15%;
-  flex-direction: column;
-  justify-content: space-between;
+
 }
 
 #console-output {
