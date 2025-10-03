@@ -28,7 +28,26 @@
                 <p>This project is a JS Runtime Engine built with Vue, Monaco Editor, and Esprima/Escodegen.</p>
               </div>
               <div v-else-if="activeTab==='settings'">
-                <p>⚙️ Settings will go here. Suggestions: toggle theme, font size, or auto-run code.</p>
+                <div class="setting-item">
+                  <label>
+                    <input type="checkbox" v-model="autoRunEnabled"> Auto-run code on Enter
+                  </label>
+                </div>
+                <div class="setting-item">
+                  <label>
+                    <input type="checkbox" v-model="darkThemeEnabled"> Dark Theme
+                  </label>
+                </div>
+                <div class="setting-item">
+                  <label for="fontSize">Font Size:</label>
+                  <select id="fontSize" v-model="fontSize">
+                    <option value="12">12px</option>
+                    <option value="14">14px</option>
+                    <option value="16">16px</option>
+                    <option value="18">18px</option>
+                    <option value="20">20px</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -55,6 +74,7 @@ import * as esprima from 'esprima';
 import * as escodegen from 'escodegen';
 
 export default {
+  name: 'App',
   data() {
     return {
       simple: `let x = 10;\nx = 20;\nlet y = 30;\nconsole.log(x);`,
@@ -64,9 +84,13 @@ export default {
       editor: null,
       isSettingsOpen: false,
       activeTab: "about",
+      autoRunEnabled: true,
+      darkThemeEnabled: true,
+      fontSize: 14
     }
   },
   async mounted() {
+    // Define custom theme
     monaco.editor.defineTheme('my-custom-theme', {
       base: 'vs-dark',
       inherit: true,
@@ -78,27 +102,39 @@ export default {
       }
     });
 
+    // Initialize editor
     const editor = monaco.editor.create(this.$refs.editorContainer, {
       value: this.simple,
       language: 'javascript',
-      theme: 'my-custom-theme',
+      theme: this.darkThemeEnabled ? 'my-custom-theme' : 'vs',
       wordWrap: 'on',
       overflow: 'hidden',
       padding: { top: 15, bottom: 15 },
       horizontalScrollbarSize: 0,
       scrollBeyondLastLine: false,
       automaticLayout: true,
+      fontSize: this.fontSize
     });
 
     this.editor = editor;
     editor.getModel().updateOptions({ tabSize: 2, insertSpaces: true });
 
+    // Setup event listeners
     editor.onDidChangeModelContent(() => {
       this.simple = editor.getValue();
     });
 
     window.addEventListener('resize', () => editor.layout());
     this.setupEditor();
+    
+    // Watch for settings changes
+    this.$watch('darkThemeEnabled', (newVal) => {
+      editor.updateOptions({ theme: newVal ? 'my-custom-theme' : 'vs' });
+    });
+    
+    this.$watch('fontSize', (newVal) => {
+      editor.updateOptions({ fontSize: newVal });
+    });
   },
   beforeUnmount() {
     if (this.editor) this.editor.dispose();
@@ -113,8 +149,10 @@ export default {
     handleKeyDown(event) {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        this.output = '';
-        this.makeJsResultOutput();
+        if (this.autoRunEnabled) {
+          this.output = '';
+          this.makeJsResultOutput();
+        }
       }
     },
     makeJsResultOutput() {
@@ -143,7 +181,7 @@ export default {
         if (result !== undefined) this.output += result;
         this.displayGlobalVariables();
       } catch (error) {
-        this.output += error.message;
+        this.output += `Error: ${error.message}`;
       } finally {
         console.log = originalConsoleLog;
       }
@@ -286,6 +324,10 @@ export default {
 .tab { cursor: pointer; padding: 4px 8px; }
 .active-tab { font-weight: bold; border-bottom: 2px solid #42b983; }
 .modal-body { margin-top: 10px; font-size: 0.9em; }
+
+.setting-item {
+  margin: 10px 0;
+}
 
 /* Global Scope + Console */
 #global-scope-display,
