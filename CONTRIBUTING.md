@@ -1,4 +1,7 @@
 # Contributing Guide
+```
+Before creating a Pull Request, it's crucial to ensure your branch is in sync with the latest changes from the main `master` branch. This is critical.
+```
 
 This document describes the basic GitFlow and Pull Request (PR) process for this repository.
 
