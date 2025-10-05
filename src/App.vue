@@ -82,8 +82,6 @@
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution';
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
-import * as esprima from 'esprima';
-import * as escodegen from 'escodegen';
 import JsonViewer from 'vue-json-viewer';
 import 'vue-json-viewer/style.css';
 import { analyzeGlobalScope } from './utils/scopeAnalysis';
@@ -174,7 +172,7 @@ export default {
         }
       }
     },
-    makeJsResultOutput() {
+    async makeJsResultOutput() {
       this.output = '';
       this.executionTime = {};
       const originalConsoleLog = console.log;
@@ -201,15 +199,15 @@ export default {
         this.globalScope = { ...this.globalScope, executionTime: this.executionTime };
 
         if (result !== undefined) this.output += result;
-        this.displayGlobalVariables();
+        await this.displayGlobalVariables();
       } catch (error) {
         this.output += `Error: ${error.message}`;
       } finally {
         console.log = originalConsoleLog;
       }
     },
-    displayGlobalVariables() {
-      const { variables } = analyzeGlobalScope(this.simple);
+    async displayGlobalVariables() {
+      const { variables } = await analyzeGlobalScope(this.simple);
       this.globalScope = { ...this.globalScope, variables };
       this.globalScopeVersion++;
     },
