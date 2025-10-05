@@ -17,7 +17,7 @@
           </div>
 
           <!-- JSON Viewer -->
-          <json-viewer :value="globalScope" :expand-depth="expandDepth" theme="dark" copyable sort
+          <json-viewer :value="globalScope" :expand-depth="expandDepth" theme="dark" sort
             :key="`gv-${expandDepth}-${globalScopeVersion}`" />
         </div>
 
@@ -70,8 +70,9 @@
     <div id="console-output" ref="outputContainer">
       <h3>Console Output</h3>
 
-      <!-- Copy Button -->
-      <button class="copy-btn" @click="copyConsoleOutput">Copy</button>
+
+    <!-- Copy Button -->
+    <button class="copy-btn" @click="copyConsoleOutput">{{ copyBtnLabel }}</button>
 
       <pre v-html="highlightJSON(output)"></pre>
     </div>
@@ -101,6 +102,8 @@ export default {
       globalScopeVersion: 0,
       autoRunEnabled: true,
       darkThemeEnabled: true,
+      copyBtnLabel: "Copy",
+      copiedBtnLabel: "Copied",
       fontSize: 14,
     };
   },
@@ -287,11 +290,14 @@ export default {
         .replace(/\bundefined\b/g, '<span class="jv-undefined">undefined</span>');
       return json;
     },
+
     copyConsoleOutput() {
       navigator.clipboard.writeText(this.output).then(() => {
-        alert('Console output copied!');
-      }).catch(err => console.error('Copy failed', err));
-    }
+        this.copyBtnLabel = 'Copied';
+        if (this.copyBtnTimer) clearTimeout(this.copyBtnTimer);
+        this.copyBtnTimer = setTimeout(() => { this.copyBtnLabel = 'Copy'; this.copyBtnTimer = null; }, 1200);
+        }).catch(err => console.error('Copy failed', err));
+      }
   }
 };
 </script>
