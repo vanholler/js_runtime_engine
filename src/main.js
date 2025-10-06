@@ -1,10 +1,15 @@
-import { app, BrowserWindow, globalShortcut } from 'electron';
+import { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (started) {
-  app.quit();
+let tray = null;
+let isQuitting = false;
+
+function getTrayIcon() {
+ // In dev use file from src/, in prod — from build resources
+ const devIcon = path.resolve(process.cwd(), 'src', 'loggo.ico');
+ const prodIcon = path.join(process.resourcesPath || process.cwd(), 'loggo.ico');
+ return nativeImage.createFromPath(app.isPackaged ? prodIcon : devIcon);
 }
 
 const createWindow = () => {
@@ -12,11 +17,12 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
-    icon: './crc/loggo.ico',
-    autoHideMenuBar: true, // Скрываем меню
+  icon: './crc/loggo.ico',
+  icon: getTrayIcon(),
+    autoHideMenuBar: true, // Hide the menu bar
     backgroundColor: '#282c34',
     webSecurity: false,
-    enableRemoteModule: true, //???????
+    enableRemoteModule: true, // ???????
     webPreferences: {
       nodeIntegration: true,
       nodeIntegrationInWorker: true,
@@ -24,6 +30,34 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js')
     },
   });
+
+ // Tray
+ tray = new Tray(getTrayIcon());
+ const contextMenu = Menu.buildFromTemplate([
+   { label: 'Show', click: () => { mainWindow.show(); mainWindow.focus(); } },
+   { type: 'separator' },
+   { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
+ ]);
+ tray.setToolTip('JS Runtime');
+ tray.setContextMenu(contextMenu);
+ tray.on('click', () => {
+   if (mainWindow.isVisible()) mainWindow.hide();
+   else { mainWindow.show(); mainWindow.focus(); }
+ });
+
+ // Minimize to tray on minimize
+ mainWindow.on('minimize', (e) => {
+   e.preventDefault();
+   mainWindow.hide();
+ });
+ 
+ // Do not close on X — hide to tray instead
+ mainWindow.on('close', (e) => {
+   if (!isQuitting) {
+     e.preventDefault();
+     mainWindow.hide();
+   }
+ });
 
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -37,30 +71,23 @@ const createWindow = () => {
     mainWindow.webContents.openDevTools();
   });
 };
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
+ 
 app.whenReady().then(() => {
   createWindow();
+ app.on('before-quit', () => { isQuitting = true; });
 
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     }
   });
 });
-
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
+ 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.quit();
+  app.quit();
+  // On Windows keep the app in the tray
+  if (!isQuitting) return;
+  app.quit();
   }
 });
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and import them here.

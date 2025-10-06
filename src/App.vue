@@ -35,7 +35,7 @@
             </div>
             <div class="modal-body">
               <div v-if="activeTab==='about'">
-                <p>This project is a JS Runtime Engine built with Vue, Monaco Editor, and Esprima/Escodegen.</p>
+                <p>This project is a JS Runtime Engine built with Vue, Monaco Editor, and babel/Esprima/Escodegen.</p>
               </div>
               <div v-else-if="activeTab==='settings'">
                 <div class="setting-item">
