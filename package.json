@@ -1,6 +1,6 @@
 {
-  "name": "JavaScript Runtime",
-  "productName": "JavaScript Runtime",
+  "name": "JS Runtime",
+  "productName": "JS Runtime",
   "version": "1.0.0",
   "description": "Runtime console for JavaScript",
   "main": ".vite/build/main.js",
@@ -37,6 +37,7 @@
     "@babel/parser": "^7.28.4",
     "@editorjs/editorjs": "^2.30.8",
     "electron-squirrel-startup": "^1.0.1",
+    "esbuild": "^0.25.10",
     "escodegen": "^2.1.0",
     "esprima": "^4.0.1",
     "highlight.js": "^11.9.0",

@@ -19,7 +19,7 @@ const createWindow = () => {
     enableRemoteModule: true, //???????
     webPreferences: {
       nodeIntegration: true,
-      nodeIntegrationInWorker: true,
+      nodeIntegrationInWorker: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
     },
