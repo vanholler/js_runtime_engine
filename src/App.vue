@@ -175,40 +175,49 @@ export default {
         }
       }
     },
-    async makeJsResultOutput() {
-      this.output = '';
-      this.executionTime = {};
-      const originalConsoleLog = console.log;
-      console.log = (message) => {
-        if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
-        else this.output += message + "\n";
-        originalConsoleLog(message);
-      };
+  async makeJsResultOutput() {
+  this.output = '';
+  this.executionTime = {};
 
-      const boundCustomConsoleLog = this.customConsoleLog.bind(this);
+  const originalConsoleLog = console.log;
+  console.log = (message) => {
+    if (typeof message === 'object') this.output += JSON.stringify(message, null, 2) + "\n";
+    else this.output += message + "\n";
+    originalConsoleLog(message);
+  };
 
-      try {
-        const startTime = performance.now();
-        const result = eval(this.simple.replace(/console\.log/g, 'boundCustomConsoleLog')); 
-        const endTime = performance.now();
-        const duration = endTime - startTime;
+  // Создаём обёртку, доступную в eval-контексте
+  const customLog = (msg) => {
+    if (typeof msg === 'object') this.output += JSON.stringify(msg, null, 2) + "\n";
+    else this.output += msg + "\n";
+  };
 
-        this.executionTime = {
-          full: `${duration} ms`,
-          microseconds: `${(duration * 1000).toFixed(2)} µs`,
-          seconds: `${(duration / 1000).toFixed(6)} s`
-        };
+  try {
+    const startTime = performance.now();
 
-        this.globalScope = { ...this.globalScope, executionTime: this.executionTime };
+    // Используем new Function вместо eval
+    const code = this.simple.replace(/console\.log/g, '__customLog');
+    const fn = new Function('__customLog', code);
+    const result = fn(customLog);
 
-        if (result !== undefined) this.output += result;
-        await this.displayGlobalVariables();
-      } catch (error) {
-        this.output += `Error: ${error.message}`;
-      } finally {
-        console.log = originalConsoleLog;
-      }
-    },
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+
+    this.executionTime = {
+      full: `${duration} ms`,
+      microseconds: `${(duration * 1000).toFixed(2)} µs`,
+      seconds: `${(duration / 1000).toFixed(6)} s`
+    };
+
+    if (result !== undefined) this.output += String(result);
+    await this.displayGlobalVariables();
+
+  } catch (error) {
+    this.output += `Error: ${error.message}\n`;
+  } finally {
+    console.log = originalConsoleLog;
+  }
+},
     async displayGlobalVariables() {
       const { variables } = await analyzeGlobalScope(this.simple);
       this.globalScope = { ...this.globalScope, variables };

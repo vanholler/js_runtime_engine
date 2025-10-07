@@ -17,8 +17,7 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1000,
     height: 800,
-  icon: './crc/loggo.ico',
-  icon: getTrayIcon(),
+    icon: getTrayIcon(),
     autoHideMenuBar: true, // Hide the menu bar
     backgroundColor: '#282c34',
     webSecurity: false,
