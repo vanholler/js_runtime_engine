@@ -1,5 +1,5 @@
 {
-  "name": "JS Runtime",
+  "name": "jsruntime",
   "productName": "JS Runtime",
   "version": "1.0.0",
   "description": "Runtime console for JavaScript",
