@@ -8,7 +8,7 @@ let isQuitting = false;
 function getTrayIcon() {
  // In dev use file from src/, in prod — from build resources
  const devIcon = path.resolve(process.cwd(), 'src', 'loggo.ico');
- const prodIcon = path.join(process.resourcesPath || process.cwd(), 'loggo.ico');
+ const prodIcon = path.join(process.resourcesPath, 'loggo.ico');
  return nativeImage.createFromPath(app.isPackaged ? prodIcon : devIcon);
 }
 
