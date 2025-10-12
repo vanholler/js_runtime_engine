@@ -85,6 +85,8 @@ import 'monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'
 import 'monaco-editor/esm/vs/language/json/monaco.contribution.js';
 import JsonViewer from 'vue-json-viewer';
 import 'vue-json-viewer/style.css';
+import prettier from 'prettier/standalone';
+import parserBabel from 'prettier/parser-babel';
 import { analyzeGlobalScope } from './utils/scopeAnalysis';
 
 export default {
@@ -130,6 +132,8 @@ export default {
       padding: { top: 15, bottom: 15 },
       horizontalScrollbarSize: 0,
       scrollBeyondLastLine: false,
+      formatOnPaste: true,
+      formatOnType: true,
       automaticLayout: true,
       fontSize: this.fontSize
     });
@@ -153,6 +157,32 @@ export default {
     this.$nextTick(() => {
       if (this.editor) {
         this.editor.updateOptions({ theme: this.darkThemeEnabled ? 'my-custom-theme' : 'vs' });
+      }
+    });
+      
+    // Register format provider for JavaScript
+    monaco.languages.registerDocumentFormattingEditProvider('javascript', {
+      async provideDocumentFormattingEdits(model) {
+        try {
+          const text = model.getValue();
+          const formatted = await prettier.format(text, {
+            parser: "babel",
+            plugins: [parserBabel],
+            semi: true,
+            singleQuote: true,
+            trailingComma: "es5",
+            printWidth: 80,
+            tabWidth: 2,
+          });
+
+          return [{
+            range: model.getFullModelRange(),
+            text: formatted
+          }];
+        } catch (error) {
+          console.error('Format provider error:', error);
+          return [];
+        }
       }
     });
   },
