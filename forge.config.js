@@ -5,7 +5,7 @@ module.exports = {
   packagerConfig: {
     asar: true,
     extraResource: [
-      './src/loggo.ico'
+      './src/logo.ico'
     ]
   },
   rebuildConfig: {},
